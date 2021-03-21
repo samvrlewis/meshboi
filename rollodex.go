@@ -82,7 +82,7 @@ func (r *rollodex) Run() {
 			continue
 		}
 
-		mesh := r.getNetwork(message.networkName)
+		mesh := r.getNetwork(message.NetworkName)
 		ipPort, ok := netaddr.FromStdAddr(addr.IP, addr.Port, "")
 
 		if !ok {
@@ -130,15 +130,17 @@ func (mesh *meshNetwork) Serve() {
 		for member := range mesh.members {
 			memberIps = append(memberIps, member)
 		}
-		mesh.membersLock.RUnlock()
 
-		b, err := json.Marshal(memberIps)
-		if err != nil {
-			panic(err)
-		}
-
+		memberMessage := NetworkMap{Addresses: memberIps}
+		memberMessage.YourIndex = 0
 		for k := range mesh.members {
+			b, err := json.Marshal(memberMessage)
+			if err != nil {
+				panic(err)
+			}
 			mesh.rollo.conn.WriteToUDP(b, k.UDPAddr())
+			memberMessage.YourIndex += 1
 		}
+		mesh.membersLock.RUnlock()
 	}
 }

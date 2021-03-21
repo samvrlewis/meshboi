@@ -3,11 +3,12 @@ package meshboi
 import "inet.af/netaddr"
 
 type HeartbeatMessage struct {
-	networkName string
+	NetworkName string
 }
 
-type NetworkMembers struct {
-	addresses []netaddr.IPPort
+type NetworkMap struct {
+	Addresses []netaddr.IPPort
+	YourIndex int
 }
 
 type Version struct {
