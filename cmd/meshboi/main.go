@@ -78,7 +78,7 @@ func main() {
 			log.Fatalln("Error setting network: ", err)
 		}
 
-		client := meshboi.NewClient(*serverIP, *serverPort, tun)
+		client := meshboi.NewMeshMember(*serverIP, *serverPort, tun)
 
 		go client.RolloReadLoop()
 		go client.RolloSendLoop()
