@@ -99,6 +99,7 @@ func (mesh *meshNetwork) timeOutInactiveMembers() {
 
 	now := time.Now()
 
+	// todo: Can't iterate and delete from a map at the same time
 	for member := range mesh.members {
 		timeSinceLastActive := now.Sub(mesh.members[member])
 
@@ -133,6 +134,10 @@ func (mesh *meshNetwork) Serve() {
 
 		memberMessage := NetworkMap{Addresses: memberIps}
 		memberMessage.YourIndex = 0
+
+		// todo: This assumes that mesh.members will be in the same order as it
+		// was when it was serialised. Which it probably won't be. Could
+		// probably iterate over memberIPs more safely instead.
 		for k := range mesh.members {
 			b, err := json.Marshal(memberMessage)
 			if err != nil {
