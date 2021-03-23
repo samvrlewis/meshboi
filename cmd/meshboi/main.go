@@ -38,7 +38,7 @@ func main() {
 	clientCommand := flag.NewFlagSet("client", flag.ExitOnError)
 	tunName := clientCommand.String("tun-name", "tun", "The name to assign to the tunnel")
 	tunIP := clientCommand.String("tun-ip", "192.168.50.2/24", "The IP address to assign to the tunnel")
-	serverIP := clientCommand.String("server-ip", "localhost", "The IP address of the meshboi server")
+	serverIP := clientCommand.String("server-ip", "127.0.0.1", "The IP address of the meshboi server")
 	serverPort := clientCommand.Int("server-port", 12345, "The port of the server")
 
 	if len(os.Args) < 2 {
