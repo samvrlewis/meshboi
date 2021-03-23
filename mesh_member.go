@@ -215,7 +215,7 @@ func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
 	peer := &Peer{remoteIP: address, tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now()}
 	c.peers[address] = peer
 
-	fmt.Println("Successfully connected to new peer %v", peer)
+	fmt.Printf("Successfully connected to new peer %v\n", peer)
 
 	go c.readLoop(dtlsConn)
 	go c.sendLoop(dtlsConn)
