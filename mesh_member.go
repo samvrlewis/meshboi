@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v2/pkg/protocol"
+	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
 	"github.com/samvrlewis/meshboi/tun"
 	"github.com/samvrlewis/udp"
 	"inet.af/netaddr"
@@ -35,6 +37,8 @@ type MeshMember struct {
 
 	// Map of real address to tun address
 	peers map[netaddr.IPPort]*Peer
+
+	startedListening bool
 
 	// maybe I could just pass a udp connection here for the server connection
 	// but then I also need to make one for each of the clients I want to talk to.. hmm.
@@ -129,7 +133,21 @@ func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun) *MeshMembe
 	myAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0")}
 	rollodexAddr := &net.UDPAddr{IP: net.ParseIP(rollodexIp), Port: rollodexPort}
 
-	listener, err := udp.Listen("udp", myAddr)
+	lc := udp.ListenConfig{
+		AcceptFilter: func(packet []byte) bool {
+			pkts, err := recordlayer.UnpackDatagram(packet)
+			if err != nil || len(pkts) < 1 {
+				return false
+			}
+			h := &recordlayer.Header{}
+			if err := h.Unmarshal(pkts[0]); err != nil {
+				return false
+			}
+			return h.ContentType == protocol.ContentTypeHandshake
+		},
+	}
+
+	listener, err := lc.Listen("udp", myAddr)
 
 	if err != nil {
 		log.Fatalln(err)
@@ -140,6 +158,7 @@ func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun) *MeshMembe
 
 	member.rolloConn = rolloConn
 	member.peers = make(map[netaddr.IPPort]*Peer)
+	member.startedListening = false
 
 	return &member
 }
@@ -172,6 +191,58 @@ func (c *MeshMember) sendLoop(conn net.Conn) {
 	}
 }
 
+func (c *MeshMember) listen() {
+	c.startedListening = true
+
+	config := &dtls.Config{
+		PSK: func(hint []byte) ([]byte, error) {
+			fmt.Printf("Server's hint: %s \n", hint)
+			return []byte{0xAB, 0xC1, 0x23}, nil
+		},
+		PSKIdentityHint:      []byte(c.myOutsideIP.String()),
+		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
+		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
+	}
+
+	for {
+		conn, err := c.listener.Accept()
+
+		if err != nil {
+			fmt.Printf("Error accepting %v", err)
+			continue
+		}
+
+		dtlsConn, err := dtls.Server(conn, config)
+
+		if err != nil {
+			fmt.Printf("Error starting dtls connection %v", err)
+			conn.Close()
+			continue
+		}
+
+		remoteTunIp := string(dtlsConn.ConnectionState().IdentityHint)
+
+		tunIP, err := netaddr.ParseIPPort(remoteTunIp)
+
+		if err != nil {
+			fmt.Printf("Error parsing tunIP from hint: %v\n", err)
+			dtlsConn.Close()
+			continue
+		}
+
+		fmt.Printf("Succesfully accepted connection from %v\n", dtlsConn.RemoteAddr())
+
+		// todo: Is it necessary to remember what the remote ip is here?
+		peer := &Peer{tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now()}
+
+		// todo: This is wrong but I can't figure out how to get the actual tunIP
+		c.peers[tunIP] = peer
+
+		go c.readLoop(dtlsConn)
+		go c.sendLoop(dtlsConn)
+	}
+}
+
 func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
 	config := &dtls.Config{
 		PSK: func(hint []byte) ([]byte, error) {
@@ -191,16 +262,10 @@ func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
 		return err
 	}
 
-	var dtlsConn *dtls.Conn
-
-	if c.AmServer(address) {
-		// the other dude will connect to us
-		dtlsConn, err = dtls.Server(conn, config)
-	} else {
-		dtlsConn, err = dtls.Client(conn, config)
-	}
+	dtlsConn, err := dtls.Client(conn, config)
 
 	if err != nil {
+		conn.Close()
 		return err
 	}
 
@@ -209,6 +274,7 @@ func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
 	tunIP, err := netaddr.ParseIPPort(remoteTunIp)
 
 	if err != nil {
+		dtlsConn.Close()
 		return err
 	}
 
@@ -235,6 +301,11 @@ func (c *MeshMember) newAddresses(addreses []netaddr.IPPort) {
 
 		if address == c.myOutsideIP {
 			// don't connect to myself
+			continue
+		}
+
+		if c.AmServer(address) {
+			// the other dude will connect to us
 			continue
 		}
 
@@ -276,6 +347,10 @@ func (c *MeshMember) RolloReadLoop() {
 		}
 
 		c.myOutsideIP = members.Addresses[members.YourIndex]
+
+		if !c.startedListening {
+			go c.listen()
+		}
 
 		fmt.Printf("%+v\n", members)
 
