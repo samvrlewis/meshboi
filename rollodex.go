@@ -135,15 +135,12 @@ func (mesh *meshNetwork) Serve() {
 		memberMessage := NetworkMap{Addresses: memberIps}
 		memberMessage.YourIndex = 0
 
-		// todo: This assumes that mesh.members will be in the same order as it
-		// was when it was serialised. Which it probably won't be. Could
-		// probably iterate over memberIPs more safely instead.
-		for k := range mesh.members {
+		for _, member := range memberIps {
 			b, err := json.Marshal(memberMessage)
 			if err != nil {
 				panic(err)
 			}
-			mesh.rollo.conn.WriteToUDP(b, k.UDPAddr())
+			mesh.rollo.conn.WriteToUDP(b, member.UDPAddr())
 			memberMessage.YourIndex += 1
 		}
 		mesh.membersLock.RUnlock()
