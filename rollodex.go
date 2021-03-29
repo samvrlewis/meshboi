@@ -24,6 +24,9 @@ type meshNetwork struct {
 }
 
 func (m *meshNetwork) register(addr netaddr.IPPort) {
+	m.membersLock.RLock()
+	defer m.membersLock.RUnlock()
+
 	println("Registering ", ":", addr.Port)
 	m.members[addr] = time.Now()
 }
@@ -99,7 +102,6 @@ func (mesh *meshNetwork) timeOutInactiveMembers() {
 
 	now := time.Now()
 
-	// todo: Can't iterate and delete from a map at the same time
 	for member := range mesh.members {
 		timeSinceLastActive := now.Sub(mesh.members[member])
 
