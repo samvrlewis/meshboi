@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	log "github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 )
 
@@ -27,7 +28,10 @@ func (m *meshNetwork) register(addr netaddr.IPPort) {
 	m.membersLock.RLock()
 	defer m.membersLock.RUnlock()
 
-	println("Registering ", ":", addr.Port)
+	log.WithFields(log.Fields{
+		"address": addr,
+	}).Info("Registering new mesh member")
+
 	m.members[addr] = time.Now()
 }
 
@@ -47,13 +51,6 @@ func (r *rollodex) getNetwork(networkName string) *meshNetwork {
 }
 
 func NewRollodex(conn *net.UDPConn) (*rollodex, error) {
-
-	// laddr, err := net.ResolveUDPAddr("udp", address)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
-	println("hello")
 	rollo := &rollodex{}
 	rollo.conn = conn
 	rollo.networks = make(map[string]*meshNetwork)
@@ -62,26 +59,19 @@ func NewRollodex(conn *net.UDPConn) (*rollodex, error) {
 }
 
 func (r *rollodex) Run() {
-	println("waiting for data")
 	buf := make([]byte, 65535)
 	for {
-		println("waiting for data")
 		n, addr, err := r.conn.ReadFromUDP(buf)
 
-		println("Got some data")
-
 		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
-			println("temp error")
+			log.Warn("Temporary error reading data: ", nerr)
 			continue
 		}
-
-		println("Got some data")
-		println(string(buf[:n]))
 
 		var message HeartbeatMessage
 
 		if err := json.Unmarshal(buf[:n], &message); err != nil {
-			println("Error unmarshalling ", err.Error())
+			log.Error("Error unmarshalling ", err)
 			continue
 		}
 
@@ -89,6 +79,7 @@ func (r *rollodex) Run() {
 		ipPort, ok := netaddr.FromStdAddr(addr.IP, addr.Port, "")
 
 		if !ok {
+			log.Error("Error converting to netaddr ", err)
 			continue
 		}
 
@@ -106,7 +97,9 @@ func (mesh *meshNetwork) timeOutInactiveMembers() {
 		timeSinceLastActive := now.Sub(mesh.members[member])
 
 		if timeSinceLastActive.Seconds() > TimeOutSecs {
-			println("Removing due to timeout ", member.Port)
+			log.WithFields(log.Fields{
+				"address": member.IP,
+			}).Info("Removing member due to timeout")
 			delete(mesh.members, member)
 		}
 	}

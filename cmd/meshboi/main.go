@@ -2,14 +2,13 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
 
 	"github.com/samvrlewis/meshboi"
 	"github.com/samvrlewis/meshboi/tun"
+	log "github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 )
 
@@ -42,8 +41,7 @@ func main() {
 	serverPort := clientCommand.Int("server-port", 12345, "The port of the server")
 
 	if len(os.Args) < 2 {
-		fmt.Println("server or client subcommand is required")
-		os.Exit(1)
+		log.Fatalln("'server' or 'client' subcommand is required")
 	}
 
 	switch os.Args[1] {
@@ -57,13 +55,10 @@ func main() {
 	}
 
 	if clientCommand.Parsed() {
-		// log.Println(*serverIP)
-		// log.Println(*serverPort)
-
 		tun, err := tun.NewTun(*tunName)
 
 		if err != nil {
-			log.Fatalln("err ", err)
+			log.Fatalln("Error creating tun: ", err)
 		}
 
 		if err := tun.SetLinkUp(); err != nil {
@@ -82,29 +77,26 @@ func main() {
 
 		go client.RolloReadLoop()
 		go client.RolloSendLoop()
-
-		c := make(chan os.Signal)
-		signal.Notify(c, os.Interrupt)
-		select {
-		case <-c:
-			log.Println("Shutting down")
-		}
 	} else if serverCommand.Parsed() {
-		log.Println("server")
 		addr := &net.UDPAddr{IP: net.ParseIP(*ip), Port: *port}
-		log.Println(addr.IP)
 		conn, err := net.ListenUDP("udp", addr)
 
 		if err != nil {
-			log.Fatalln("err ", err)
+			log.Fatalln("Error starting listener ", err)
 		}
 
 		rollo, err := meshboi.NewRollodex(conn)
 
 		if err != nil {
-			log.Fatalln("err ", err)
+			log.Fatalln("Error creating rollodex ", err)
 		}
-		log.Println("server")
 		rollo.Run()
+	}
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt)
+	select {
+	case <-c:
+		log.Info("Shutting down")
 	}
 }
