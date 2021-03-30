@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	MTU_SIZE = 1500
+	MTU_SIZE = 1000
 )
 
 type registerMessage struct {
@@ -78,7 +78,7 @@ func main() {
 			log.Fatalln("Error setting network: ", err)
 		}
 
-		client := meshboi.NewMeshMember(*serverIP, *serverPort, tun)
+		client := meshboi.NewMeshMember(*serverIP, *serverPort, tun, netaddr.MustParseIPPrefix(*tunIP).IP)
 
 		go client.RolloReadLoop()
 		go client.RolloSendLoop()

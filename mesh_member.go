@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/pion/dtls/v2"
@@ -12,16 +13,81 @@ import (
 	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
 	"github.com/samvrlewis/meshboi/tun"
 	"github.com/samvrlewis/udp"
+	"golang.org/x/net/ipv4"
 	"inet.af/netaddr"
 )
 
 const bufSize = 8192
 
+const (
+	MTU_SIZE = 1300
+)
+
 type Peer struct {
-	tunIP         netaddr.IPPort
+	tunIP         netaddr.IP
 	remoteIP      netaddr.IPPort
 	lastContacted time.Time
 	conn          *dtls.Conn
+	outgoing      chan []byte
+	member        *MeshMember
+}
+
+type PeerStore struct {
+	peersByOutsideIPPort map[netaddr.IPPort]*Peer
+	peersByInsideIP      map[netaddr.IP]*Peer
+	lock                 sync.RWMutex
+}
+
+func NewPeerStore() *PeerStore {
+	s := &PeerStore{}
+	s.peersByInsideIP = make(map[netaddr.IP]*Peer)
+	s.peersByOutsideIPPort = make(map[netaddr.IPPort]*Peer)
+
+	return s
+}
+
+func (p *PeerStore) Add(peer *Peer) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	p.peersByInsideIP[peer.tunIP] = peer
+	p.peersByOutsideIPPort[peer.remoteIP] = peer
+}
+
+func (p *PeerStore) GetByInsideIp(insideIP netaddr.IP) (*Peer, bool) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	peer, ok := p.peersByInsideIP[insideIP]
+
+	return peer, ok
+}
+
+func (p *PeerStore) GetByOutsideIpPort(outsideIPPort netaddr.IPPort) (*Peer, bool) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	peer, ok := p.peersByOutsideIPPort[outsideIPPort]
+
+	return peer, ok
+}
+
+func (p *PeerStore) RemoveByOutsideIPPort(outsideIPPort netaddr.IPPort) bool {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+
+	peer, ok := p.GetByOutsideIpPort(outsideIPPort)
+
+	if !ok {
+		return false
+	}
+
+	insideIp := peer.tunIP
+
+	delete(p.peersByInsideIP, insideIp)
+	delete(p.peersByOutsideIPPort, outsideIPPort)
+
+	return true
 }
 
 type MeshMember struct {
@@ -30,13 +96,13 @@ type MeshMember struct {
 	quit        chan bool
 	rolloConn   net.Conn
 	myOutsideIP netaddr.IPPort
+	myInsideIP  netaddr.IP
 
 	// This manages and multiplexes a set of udp "connections" that are all on a
 	// connected to a single local port.
 	listener *udp.Listener
 
-	// Map of real address to tun address
-	peers map[netaddr.IPPort]*Peer
+	peerStore *PeerStore
 
 	startedListening bool
 
@@ -112,7 +178,7 @@ func (p *Peer) PeerServe() {
 	// ipPort.IP
 }
 
-func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun) *MeshMember {
+func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun, myInsideIP netaddr.IP) *MeshMember {
 	member := MeshMember{rollodexIp: rollodexIp, tun: tun}
 	member.quit = make(chan bool)
 
@@ -157,37 +223,61 @@ func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun) *MeshMembe
 	rolloConn, err := member.listener.CreateConn(rollodexAddr)
 
 	member.rolloConn = rolloConn
-	member.peers = make(map[netaddr.IPPort]*Peer)
+	member.peerStore = NewPeerStore()
 	member.startedListening = false
+	member.myInsideIP = myInsideIP
+
+	go member.tunReadLoop()
 
 	return &member
 }
 
-func (c *MeshMember) readLoop(conn net.Conn) {
+func (p *Peer) readLoop() {
 	b := make([]byte, bufSize)
 	for {
-		n, err := conn.Read(b)
+		n, err := p.conn.Read(b)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("Got message: %s\n", string(b[:n]))
+		fmt.Printf("Got message: %v\n", b[:n])
+
+		header, _ := ipv4.ParseHeader(b[:n])
+
+		fmt.Printf("isTCP: %v, header: %s\n", header.Protocol == 6, header)
+		fmt.Println("From IP: ", header.Src.String())
+		fmt.Println("To IP: ", header.Dst.String())
+
+		written, err := p.member.tun.Write(b[:n])
+
+		if err != nil {
+			panic(err)
+		}
+
+		if written != n {
+			println("Didn't write all to tun")
+			fmt.Printf("Written %v n %v\n", written, n)
+		}
 	}
 }
 
 // Chat starts the stdin readloop to dispatch messages to the hub
-func (c *MeshMember) sendLoop(conn net.Conn) {
-	counter := 0
+func (p *Peer) sendLoop() {
 	for {
-		msg := fmt.Sprintf("Hello %d from %v", counter, c.myOutsideIP)
-		counter += 1
-		n, err := conn.Write([]byte(msg))
+		data := <-p.outgoing
+
+		fmt.Printf("Going to send to peer")
+		fmt.Printf("Sending message: %v\n", data)
+		n, err := p.conn.Write(data)
 
 		fmt.Printf("Wrote %d\n", n)
 
 		if err != nil {
 			panic(err)
 		}
-		time.Sleep(5 * time.Second)
+
+		if n != len(data) {
+			println("Didn't write all data")
+		}
 	}
 }
 
@@ -199,7 +289,7 @@ func (c *MeshMember) listen() {
 			fmt.Printf("Server's hint: %s \n", hint)
 			return []byte{0xAB, 0xC1, 0x23}, nil
 		},
-		PSKIdentityHint:      []byte(c.myOutsideIP.String()),
+		PSKIdentityHint:      []byte(c.myInsideIP.String()),
 		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
 		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
 	}
@@ -222,7 +312,7 @@ func (c *MeshMember) listen() {
 
 		remoteTunIp := string(dtlsConn.ConnectionState().IdentityHint)
 
-		tunIP, err := netaddr.ParseIPPort(remoteTunIp)
+		tunIP, err := netaddr.ParseIP(remoteTunIp)
 
 		if err != nil {
 			fmt.Printf("Error parsing tunIP from hint: %v\n", err)
@@ -233,13 +323,13 @@ func (c *MeshMember) listen() {
 		fmt.Printf("Succesfully accepted connection from %v\n", dtlsConn.RemoteAddr())
 
 		// todo: Is it necessary to remember what the remote ip is here?
-		peer := &Peer{tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now()}
+		peer := &Peer{tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now(), outgoing: make(chan []byte), member: c}
 
 		// todo: This is wrong but I can't figure out how to get the actual tunIP
-		c.peers[tunIP] = peer
+		c.peerStore.Add(peer)
 
-		go c.readLoop(dtlsConn)
-		go c.sendLoop(dtlsConn)
+		go peer.readLoop()
+		go peer.sendLoop()
 	}
 }
 
@@ -249,7 +339,7 @@ func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
 			fmt.Printf("Server's hint: %s \n", hint)
 			return []byte{0xAB, 0xC1, 0x23}, nil
 		},
-		PSKIdentityHint:      []byte(c.myOutsideIP.String()),
+		PSKIdentityHint:      []byte(c.myInsideIP.String()),
 		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
 		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
 	}
@@ -271,27 +361,27 @@ func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
 
 	remoteTunIp := string(dtlsConn.ConnectionState().IdentityHint)
 
-	tunIP, err := netaddr.ParseIPPort(remoteTunIp)
+	tunIP, err := netaddr.ParseIP(remoteTunIp)
 
 	if err != nil {
 		dtlsConn.Close()
 		return err
 	}
 
-	peer := &Peer{remoteIP: address, tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now()}
-	c.peers[address] = peer
+	peer := &Peer{remoteIP: address, tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now(), member: c, outgoing: make(chan []byte)}
+	c.peerStore.Add(peer)
 
 	fmt.Printf("Successfully connected to new peer %v\n", peer)
 
-	go c.readLoop(dtlsConn)
-	go c.sendLoop(dtlsConn)
+	go peer.readLoop()
+	go peer.sendLoop()
 
 	return nil
 }
 
 func (c *MeshMember) newAddresses(addreses []netaddr.IPPort) {
 	for _, address := range addreses {
-		_, ok := c.peers[address]
+		_, ok := c.peerStore.GetByOutsideIpPort(address)
 
 		if ok {
 			// we already know of this peer
@@ -310,7 +400,7 @@ func (c *MeshMember) newAddresses(addreses []netaddr.IPPort) {
 		}
 
 		fmt.Printf("Going to try to connect to %v\n", address)
-		fmt.Printf("Currently connected to %v\n", c.peers)
+		fmt.Printf("Currently connected to %v\n", c.peerStore.peersByInsideIP)
 
 		if err := c.connectToNewPeer(address); err != nil {
 			fmt.Println("Could not connect to ", address, err)
@@ -378,5 +468,57 @@ func (c *MeshMember) RolloSendLoop() {
 		if err != nil {
 			panic(err)
 		}
+	}
+}
+
+func (p *Peer) addData(data []byte) {
+	p.outgoing <- data
+}
+
+func (c *MeshMember) sendToPeer(vpnIP netaddr.IP, data []byte) {
+	peer, ok := c.peerStore.GetByInsideIp(vpnIP)
+
+	if !ok {
+		fmt.Printf("Dropping data destined for %v\n", vpnIP)
+		return
+	}
+
+	peer.addData(data)
+}
+
+func (c *MeshMember) tunReadLoop() {
+	packet := make([]byte, MTU_SIZE)
+	for {
+		// Check if we should quit before continuing
+		select {
+		case <-c.quit:
+			return
+		default:
+			break
+		}
+
+		n, err := c.tun.Read(packet)
+		if err != nil {
+			log.Println(err)
+		}
+
+		println("Read some data")
+
+		header, err := ipv4.ParseHeader(packet[:n])
+
+		if err != nil {
+			log.Println(err)
+		}
+
+		fromIp, ok := netaddr.FromStdIP(header.Dst)
+
+		if !ok {
+			log.Panicln("Error converting to netaddr")
+			continue
+		}
+
+		fmt.Printf("Data is going to %v\n", fromIp)
+
+		c.sendToPeer(fromIp, packet[:n])
 	}
 }
