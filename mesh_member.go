@@ -94,6 +94,17 @@ func (c *MeshMember) AmServer(other netaddr.IPPort) bool {
 	}
 }
 
+func (c *MeshMember) GetDtlsConfig() *dtls.Config {
+	return &dtls.Config{
+		PSK: func(hint []byte) ([]byte, error) {
+			return []byte{0xAB, 0xC1, 0x23}, nil
+		},
+		PSKIdentityHint:      []byte(c.myInsideIP.String()),
+		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
+		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
+	}
+}
+
 func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun, myInsideIP netaddr.IP) *MeshMember {
 	member := MeshMember{rollodexIp: rollodexIp, tun: tun}
 	member.quit = make(chan bool)
@@ -148,17 +159,36 @@ func NewMeshMember(rollodexIp string, rollodexPort int, tun *tun.Tun, myInsideIP
 	return &member
 }
 
-func (c *MeshMember) listen() {
-	c.startedListening = true
+func (c *MeshMember) OnNewPeerConnection(conn *dtls.Conn) error {
+	peerIpString := string(conn.ConnectionState().IdentityHint)
+	peerVpnIP, err := netaddr.ParseIP(peerIpString)
 
-	config := &dtls.Config{
-		PSK: func(hint []byte) ([]byte, error) {
-			return []byte{0xAB, 0xC1, 0x23}, nil
-		},
-		PSKIdentityHint:      []byte(c.myInsideIP.String()),
-		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
-		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
+	if err != nil {
+		log.Warn("Error parsing tunIP from hint: ", err)
+		conn.Close()
+		return err
 	}
+
+	outsideAddr, err := netaddr.ParseIPPort(conn.RemoteAddr().String())
+
+	if err != nil {
+		conn.Close()
+		return err
+	}
+
+	log.Info("Succesfully accepted connection from ", conn.RemoteAddr())
+
+	peer := NewPeer(peerVpnIP, outsideAddr, conn, c.tun)
+	c.peerStore.Add(&peer)
+
+	go peer.readLoop()
+	go peer.sendLoop()
+
+	return nil
+}
+
+func (c *MeshMember) listenForPeers() {
+	c.startedListening = true
 
 	for {
 		conn, err := c.listener.Accept()
@@ -168,7 +198,7 @@ func (c *MeshMember) listen() {
 			continue
 		}
 
-		dtlsConn, err := dtls.Server(conn, config)
+		dtlsConn, err := dtls.Server(conn, c.GetDtlsConfig())
 
 		if err != nil {
 			log.Warn("Error starting dtls connection: ", err)
@@ -176,72 +206,25 @@ func (c *MeshMember) listen() {
 			continue
 		}
 
-		remoteTunIp := string(dtlsConn.ConnectionState().IdentityHint)
-
-		tunIP, err := netaddr.ParseIP(remoteTunIp)
-
-		if err != nil {
-			log.Warn("Error parsing tunIP from hint: ", err)
-			dtlsConn.Close()
-			continue
-		}
-
-		log.Info("Succesfully accepted connection from ", dtlsConn.RemoteAddr())
-
-		// todo: Is it necessary to remember what the remote ip is here?
-		peer := &Peer{tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now(), outgoing: make(chan []byte), member: c}
-
-		// todo: This is wrong but I can't figure out how to get the actual tunIP
-		c.peerStore.Add(peer)
-
-		go peer.readLoop()
-		go peer.sendLoop()
+		c.OnNewPeerConnection(dtlsConn)
 	}
 }
 
 func (c *MeshMember) connectToNewPeer(address netaddr.IPPort) error {
-	config := &dtls.Config{
-		PSK: func(hint []byte) ([]byte, error) {
-			return []byte{0xAB, 0xC1, 0x23}, nil
-		},
-		PSKIdentityHint:      []byte(c.myInsideIP.String()),
-		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
-		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
-	}
-
-	//ctx, _ := context.WithTimeout(context.Background(), 30*time.Second)
-	//defer cancel()
 	conn, err := c.listener.CreateConn(address.UDPAddr())
 
 	if err != nil {
 		return err
 	}
 
-	dtlsConn, err := dtls.Client(conn, config)
+	dtlsConn, err := dtls.Client(conn, c.GetDtlsConfig())
 
 	if err != nil {
 		conn.Close()
 		return err
 	}
 
-	remoteTunIp := string(dtlsConn.ConnectionState().IdentityHint)
-
-	tunIP, err := netaddr.ParseIP(remoteTunIp)
-
-	if err != nil {
-		dtlsConn.Close()
-		return err
-	}
-
-	peer := &Peer{remoteIP: address, tunIP: tunIP, conn: dtlsConn, lastContacted: time.Now(), member: c, outgoing: make(chan []byte)}
-	c.peerStore.Add(peer)
-
-	log.Info("Successfully connected to new peer ", peer)
-
-	go peer.readLoop()
-	go peer.sendLoop()
-
-	return nil
+	return c.OnNewPeerConnection(dtlsConn)
 }
 
 func (c *MeshMember) newAddresses(addreses []netaddr.IPPort) {
@@ -302,8 +285,9 @@ func (c *MeshMember) RolloReadLoop() {
 
 		c.myOutsideIP = members.Addresses[members.YourIndex]
 
+		// todo: Communicate this through a channel
 		if !c.startedListening {
-			go c.listen()
+			go c.listenForPeers()
 		}
 
 		c.newAddresses(members.Addresses)
@@ -340,7 +324,7 @@ func (c *MeshMember) sendToPeer(vpnIP netaddr.IP, data []byte) {
 		return
 	}
 
-	peer.addData(data)
+	peer.QueueData(data)
 }
 
 func (c *MeshMember) tunReadLoop() {

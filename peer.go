@@ -5,17 +5,39 @@ import (
 	"sync"
 	"time"
 
+	"github.com/samvrlewis/meshboi/tun"
 	log "github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 )
 
+// Represents a peer that has been connected to
 type Peer struct {
-	tunIP         netaddr.IP
-	remoteIP      netaddr.IPPort
+	// The IP address within the VPN
+	insideIP netaddr.IP
+
+	// The IP address over the internet
+	outsideAddr netaddr.IPPort
+
+	// Time of last contact
 	lastContacted time.Time
 	conn          net.Conn
 	outgoing      chan []byte
-	member        *MeshMember
+	tun           *tun.Tun
+}
+
+func NewPeer(insideIP netaddr.IP, outsideAddr netaddr.IPPort, conn net.Conn, tun *tun.Tun) Peer {
+	return Peer{
+		insideIP:      insideIP,
+		outsideAddr:   outsideAddr,
+		conn:          conn,
+		tun:           tun,
+		lastContacted: time.Now(),
+		outgoing:      make(chan []byte),
+	}
+}
+
+func (p *Peer) QueueData(data []byte) {
+	p.outgoing <- data
 }
 
 func (p *Peer) readLoop() {
@@ -27,7 +49,7 @@ func (p *Peer) readLoop() {
 		}
 		log.Info("Got message: ", b[:n])
 
-		written, err := p.member.tun.Write(b[:n])
+		written, err := p.tun.Write(b[:n])
 
 		if err != nil {
 			panic(err)
@@ -59,10 +81,6 @@ func (p *Peer) sendLoop() {
 	}
 }
 
-func (p *Peer) addData(data []byte) {
-	p.outgoing <- data
-}
-
 type PeerStore struct {
 	peersByOutsideIPPort map[netaddr.IPPort]*Peer
 	peersByInsideIP      map[netaddr.IP]*Peer
@@ -81,8 +99,8 @@ func (p *PeerStore) Add(peer *Peer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
-	p.peersByInsideIP[peer.tunIP] = peer
-	p.peersByOutsideIPPort[peer.remoteIP] = peer
+	p.peersByInsideIP[peer.insideIP] = peer
+	p.peersByOutsideIPPort[peer.outsideAddr] = peer
 }
 
 func (p *PeerStore) GetByInsideIp(insideIP netaddr.IP) (*Peer, bool) {
@@ -113,7 +131,7 @@ func (p *PeerStore) RemoveByOutsideIPPort(outsideIPPort netaddr.IPPort) bool {
 		return false
 	}
 
-	insideIp := peer.tunIP
+	insideIp := peer.insideIP
 
 	delete(p.peersByInsideIP, insideIp)
 	delete(p.peersByOutsideIPPort, outsideIPPort)
