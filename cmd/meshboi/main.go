@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	"github.com/samvrlewis/meshboi"
 	"github.com/samvrlewis/meshboi/tun"
@@ -12,27 +13,11 @@ import (
 	"inet.af/netaddr"
 )
 
-const (
-	MTU_SIZE = 1000
-)
-
-type registerMessage struct {
-	vpnIp string
-}
-
-type clientsMessage struct {
-	// mapping of internal IPs to external IP and ports
-}
-
-type allIps struct {
-	Members []netaddr.IPPort
-}
-
 func main() {
 
-	serverCommand := flag.NewFlagSet("server", flag.ExitOnError) // "address book?" "rollodex?"
-	ip := serverCommand.String("server-ip", "127.0.0.1", "The IP address of the meshboi server")
-	port := serverCommand.Int("server-port", 12345, "The port of the server")
+	rollodexCommand := flag.NewFlagSet("rollodex", flag.ExitOnError) // "address book?" "rollodex?"
+	ip := rollodexCommand.String("server-ip", "127.0.0.1", "The IP address of the meshboi server")
+	port := rollodexCommand.Int("server-port", 12345, "The port of the server")
 
 	clientCommand := flag.NewFlagSet("client", flag.ExitOnError)
 	tunName := clientCommand.String("tun-name", "tun", "The name to assign to the tunnel")
@@ -45,8 +30,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
-	case "server":
-		serverCommand.Parse(os.Args[2:])
+	case "rollodex":
+		rollodexCommand.Parse(os.Args[2:])
 	case "client":
 		clientCommand.Parse(os.Args[2:])
 	default:
@@ -69,15 +54,37 @@ func main() {
 			log.Fatalln("Error setting network: ", err)
 		}
 
-		if err := tun.SetMtu(MTU_SIZE); err != nil {
+		if err := tun.SetMtu(1500); err != nil {
 			log.Fatalln("Error setting network: ", err)
 		}
 
-		client := meshboi.NewMeshMember(*serverIP, *serverPort, tun, netaddr.MustParseIPPrefix(*tunIP).IP)
+		listenAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0")}
 
-		go client.RolloReadLoop()
-		go client.RolloSendLoop()
-	} else if serverCommand.Parsed() {
+		multiplexConn, err := meshboi.NewMultiplexedDTLSConn(listenAddr)
+
+		if err != nil {
+			log.Fatalln("Error creating multiplexed conn ", err)
+		}
+
+		rollodexAddr := &net.UDPAddr{IP: net.ParseIP(*serverIP), Port: *serverPort}
+		rollodexConn, err := multiplexConn.GetDialer().Dial(rollodexAddr)
+
+		if err != nil {
+			log.Fatalln("Error connecting to rollodex server")
+		}
+
+		peerStore := meshboi.NewPeerStore()
+
+		peerConnector := meshboi.NewPeerConnector(netaddr.MustParseIPPrefix(*tunIP).IP, multiplexConn.GetListener(), multiplexConn.GetDialer(), peerStore, tun)
+		rollodexClient := meshboi.NewRollodexClient("samsNetwork", rollodexConn, time.Duration(5*time.Second), peerConnector.OnNetworkMapUpdate)
+		tunRouter := meshboi.NewTunRouter(tun, peerStore)
+
+		go tunRouter.Run()
+		go peerConnector.ListenForPeers()
+		go rollodexClient.RolloReadLoop()
+		go rollodexClient.RolloSendLoop()
+
+	} else if rollodexCommand.Parsed() {
 		addr := &net.UDPAddr{IP: net.ParseIP(*ip), Port: *port}
 		conn, err := net.ListenUDP("udp", addr)
 

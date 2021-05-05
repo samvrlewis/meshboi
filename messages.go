@@ -10,7 +10,3 @@ type NetworkMap struct {
 	Addresses []netaddr.IPPort
 	YourIndex int
 }
-
-type Version struct {
-	version string
-}
