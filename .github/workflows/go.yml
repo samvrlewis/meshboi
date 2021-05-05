@@ -2,12 +2,11 @@ name: Go
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, test-ci ]
   pull_request:
     branches: [ main ]
 
 jobs:
-
   build:
     runs-on: ubuntu-latest
     steps:
@@ -23,3 +22,15 @@ jobs:
 
     - name: Test
       run: go test -v ./...
+
+  integration-test:
+    container:
+      image: golang:1.16.3-buster
+      options: --privileged
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Integration test
+      run: ./scripts/setup_ns.sh
