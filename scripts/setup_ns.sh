@@ -8,7 +8,7 @@
 set -x
 
 trap "exit" INT TERM
-trap "kill 0; exit 0" EXIT
+trap "pkill -P $$; exit 0" EXIT
 
 go build -o meshboi cmd/meshboi/main.go
 
