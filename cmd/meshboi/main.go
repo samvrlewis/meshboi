@@ -81,8 +81,8 @@ func main() {
 
 		go tunRouter.Run()
 		go peerConnector.ListenForPeers()
-		go rollodexClient.RolloReadLoop()
-		go rollodexClient.RolloSendLoop()
+		go rollodexClient.Run()
+		defer rollodexClient.Stop()
 
 	} else if rollodexCommand.Parsed() {
 		addr := &net.UDPAddr{IP: net.ParseIP(*ip), Port: *port}
