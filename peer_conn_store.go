@@ -47,14 +47,14 @@ func (p *PeerConnStore) GetByOutsideIpPort(outsideIPPort netaddr.IPPort) (*PeerC
 }
 
 func (p *PeerConnStore) RemoveByOutsideIPPort(outsideIPPort netaddr.IPPort) bool {
-	p.lock.Lock()
-	defer p.lock.Unlock()
-
 	peer, ok := p.GetByOutsideIpPort(outsideIPPort)
 
 	if !ok {
 		return false
 	}
+
+	p.lock.Lock()
+	defer p.lock.Unlock()
 
 	insideIp := peer.insideIP
 
