@@ -25,10 +25,10 @@ type PeerConn struct {
 	// the connection to the peer
 	conn     net.Conn
 	outgoing chan []byte
-	tun      *tun.Tun
+	tun      tun.TunConn
 }
 
-func NewPeerConn(insideIP netaddr.IP, outsideAddr netaddr.IPPort, conn net.Conn, tun *tun.Tun) PeerConn {
+func NewPeerConn(insideIP netaddr.IP, outsideAddr netaddr.IPPort, conn net.Conn, tun tun.TunConn) PeerConn {
 	return PeerConn{
 		insideIP:      insideIP, // maybe these dont need to be inside the peer. could just be in the peer store
 		outsideAddr:   outsideAddr,

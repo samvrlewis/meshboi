@@ -10,12 +10,12 @@ import (
 )
 
 type TunRouter struct {
-	tun   *tun.Tun
+	tun   tun.TunConn
 	store *PeerConnStore
 	quit  chan struct{}
 }
 
-func NewTunRouter(tun *tun.Tun, store *PeerConnStore) TunRouter {
+func NewTunRouter(tun tun.TunConn, store *PeerConnStore) TunRouter {
 	return TunRouter{
 		tun:   tun,
 		store: store,

@@ -25,6 +25,10 @@ type Tun struct {
 	Name string
 }
 
+type TunConn interface {
+	io.ReadWriteCloser
+}
+
 //https://www.kernel.org/doc/Documentation/networking/tuntap.txt
 func NewTun(name string) (*Tun, error) {
 	//todo: Why not just replace this with /sbin/ip calls?
