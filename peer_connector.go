@@ -12,7 +12,7 @@ import (
 )
 
 type PeerConnector struct {
-	store         *PeerStore
+	store         *PeerConnStore
 	listener      net.Listener
 	dialer        PeerDialer
 	myOutsideAddr netaddr.IPPort
@@ -53,7 +53,7 @@ func (pc *PeerConnector) AmServer(other netaddr.IPPort) bool {
 	}
 }
 
-func NewPeerConnector(insideIp netaddr.IP, peerListener net.Listener, peerDialer PeerDialer, store *PeerStore, tun *tun.Tun) PeerConnector {
+func NewPeerConnector(insideIp netaddr.IP, peerListener net.Listener, peerDialer PeerDialer, store *PeerConnStore, tun *tun.Tun) PeerConnector {
 	return PeerConnector{
 		listener:   peerListener,
 		dialer:     peerDialer,
@@ -104,7 +104,7 @@ func (pc *PeerConnector) OnNewPeerConnection(conn *dtls.Conn) error {
 
 	log.Info("Succesfully accepted connection from ", conn.RemoteAddr())
 
-	peer := NewPeer(peerVpnIP, outsideAddr, conn, pc.tun)
+	peer := NewPeerConn(peerVpnIP, outsideAddr, conn, pc.tun)
 
 	pc.store.Add(&peer)
 

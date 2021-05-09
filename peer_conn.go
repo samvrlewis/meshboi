@@ -11,8 +11,8 @@ import (
 
 const bufSize = 65535
 
-// Represents a peer that has been connected to
-type Peer struct {
+// Represents a connection to a peer
+type PeerConn struct {
 	// The IP address within the VPN
 	insideIP netaddr.IP
 
@@ -28,8 +28,8 @@ type Peer struct {
 	tun      *tun.Tun
 }
 
-func NewPeer(insideIP netaddr.IP, outsideAddr netaddr.IPPort, conn net.Conn, tun *tun.Tun) Peer {
-	return Peer{
+func NewPeerConn(insideIP netaddr.IP, outsideAddr netaddr.IPPort, conn net.Conn, tun *tun.Tun) PeerConn {
+	return PeerConn{
 		insideIP:      insideIP, // maybe these dont need to be inside the peer. could just be in the peer store
 		outsideAddr:   outsideAddr,
 		conn:          conn,
@@ -39,11 +39,11 @@ func NewPeer(insideIP netaddr.IP, outsideAddr netaddr.IPPort, conn net.Conn, tun
 	}
 }
 
-func (p *Peer) QueueData(data []byte) {
+func (p *PeerConn) QueueData(data []byte) {
 	p.outgoing <- data
 }
 
-func (p *Peer) readLoop() {
+func (p *PeerConn) readLoop() {
 	b := make([]byte, bufSize)
 	for {
 		n, err := p.conn.Read(b)
@@ -68,7 +68,7 @@ func (p *Peer) readLoop() {
 }
 
 // Chat starts the stdin readloop to dispatch messages to the hub
-func (p *Peer) sendLoop() {
+func (p *PeerConn) sendLoop() {
 	for {
 		data := <-p.outgoing
 

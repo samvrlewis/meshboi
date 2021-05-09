@@ -73,7 +73,7 @@ func main() {
 			log.Fatalln("Error connecting to rollodex server")
 		}
 
-		peerStore := meshboi.NewPeerStore()
+		peerStore := meshboi.NewPeerConnStore()
 
 		peerConnector := meshboi.NewPeerConnector(netaddr.MustParseIPPrefix(*tunIP).IP, multiplexConn.GetListener(), multiplexConn.GetDialer(), peerStore, tun)
 		rollodexClient := meshboi.NewRollodexClient("samsNetwork", rollodexConn, time.Duration(5*time.Second), peerConnector.OnNetworkMapUpdate)

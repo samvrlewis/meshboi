@@ -6,21 +6,21 @@ import (
 	"inet.af/netaddr"
 )
 
-type PeerStore struct {
-	peersByOutsideIPPort map[netaddr.IPPort]*Peer
-	peersByInsideIP      map[netaddr.IP]*Peer
+type PeerConnStore struct {
+	peersByOutsideIPPort map[netaddr.IPPort]*PeerConn
+	peersByInsideIP      map[netaddr.IP]*PeerConn
 	lock                 sync.RWMutex
 }
 
-func NewPeerStore() *PeerStore {
-	s := &PeerStore{}
-	s.peersByInsideIP = make(map[netaddr.IP]*Peer)
-	s.peersByOutsideIPPort = make(map[netaddr.IPPort]*Peer)
+func NewPeerConnStore() *PeerConnStore {
+	s := &PeerConnStore{}
+	s.peersByInsideIP = make(map[netaddr.IP]*PeerConn)
+	s.peersByOutsideIPPort = make(map[netaddr.IPPort]*PeerConn)
 
 	return s
 }
 
-func (p *PeerStore) Add(peer *Peer) {
+func (p *PeerConnStore) Add(peer *PeerConn) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -28,7 +28,7 @@ func (p *PeerStore) Add(peer *Peer) {
 	p.peersByOutsideIPPort[peer.outsideAddr] = peer
 }
 
-func (p *PeerStore) GetByInsideIp(insideIP netaddr.IP) (*Peer, bool) {
+func (p *PeerConnStore) GetByInsideIp(insideIP netaddr.IP) (*PeerConn, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -37,7 +37,7 @@ func (p *PeerStore) GetByInsideIp(insideIP netaddr.IP) (*Peer, bool) {
 	return peer, ok
 }
 
-func (p *PeerStore) GetByOutsideIpPort(outsideIPPort netaddr.IPPort) (*Peer, bool) {
+func (p *PeerConnStore) GetByOutsideIpPort(outsideIPPort netaddr.IPPort) (*PeerConn, bool) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
@@ -46,7 +46,7 @@ func (p *PeerStore) GetByOutsideIpPort(outsideIPPort netaddr.IPPort) (*Peer, boo
 	return peer, ok
 }
 
-func (p *PeerStore) RemoveByOutsideIPPort(outsideIPPort netaddr.IPPort) bool {
+func (p *PeerConnStore) RemoveByOutsideIPPort(outsideIPPort netaddr.IPPort) bool {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 
