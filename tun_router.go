@@ -53,7 +53,10 @@ func (tr *TunRouter) Run() {
 			continue
 		}
 
-		peer.QueueData(packet[:n])
+		msg := make([]byte, n)
+		copy(msg, packet[:n])
+
+		peer.QueueData(msg)
 	}
 }
 
