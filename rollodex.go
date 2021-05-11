@@ -27,8 +27,8 @@ type meshNetwork struct {
 }
 
 func (m *meshNetwork) register(addr netaddr.IPPort) {
-	m.membersLock.RLock()
-	defer m.membersLock.RUnlock()
+	m.membersLock.Lock()
+	defer m.membersLock.Unlock()
 
 	log.WithFields(log.Fields{
 		"address": addr,
