@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"github.com/samvrlewis/meshboi"
-	"github.com/samvrlewis/meshboi/tun"
 	log "github.com/sirupsen/logrus"
-	"inet.af/netaddr"
 )
 
 func main() {
@@ -40,50 +38,8 @@ func main() {
 	}
 
 	if clientCommand.Parsed() {
-		tun, err := tun.NewTun(*tunName)
-
-		if err != nil {
-			log.Fatalln("Error creating tun: ", err)
-		}
-
-		if err := tun.SetLinkUp(); err != nil {
-			log.Fatalln("Error setting TUN link up: ", err)
-		}
-
-		if err := tun.SetNetwork(*tunIP); err != nil {
-			log.Fatalln("Error setting network: ", err)
-		}
-
-		if err := tun.SetMtu(1500); err != nil {
-			log.Fatalln("Error setting network: ", err)
-		}
-
-		listenAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0")}
-
-		multiplexConn, err := meshboi.NewMultiplexedDTLSConn(listenAddr)
-
-		if err != nil {
-			log.Fatalln("Error creating multiplexed conn ", err)
-		}
-
-		rollodexAddr := &net.UDPAddr{IP: net.ParseIP(*serverIP), Port: *serverPort}
-		rollodexConn, err := multiplexConn.GetDialer().Dial(rollodexAddr)
-
-		if err != nil {
-			log.Fatalln("Error connecting to rollodex server")
-		}
-
-		peerStore := meshboi.NewPeerConnStore()
-
-		peerConnector := meshboi.NewPeerConnector(netaddr.MustParseIPPrefix(*tunIP).IP, multiplexConn.GetListener(), multiplexConn.GetDialer(), peerStore, tun)
-		rollodexClient := meshboi.NewRollodexClient("samsNetwork", rollodexConn, time.Duration(5*time.Second), peerConnector.OnNetworkMapUpdate)
-		tunRouter := meshboi.NewTunRouter(tun, peerStore)
-
-		go tunRouter.Run()
-		go peerConnector.ListenForPeers()
-		go rollodexClient.Run()
-		defer rollodexClient.Stop()
-
+		mc := meshboi.NewMeshBoiClient(*tunName, *tunIP, net.ParseIP(*serverIP), *serverPort)
+		mc.Run()
 	} else if rollodexCommand.Parsed() {
 		addr := &net.UDPAddr{IP: net.ParseIP(*ip), Port: *port}
 		conn, err := net.ListenUDP("udp", addr)
