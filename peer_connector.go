@@ -17,7 +17,7 @@ type PeerConnector struct {
 	dialer        PeerDialer
 	myOutsideAddr netaddr.IPPort
 	myInsideIP    netaddr.IP
-	tun           *tun.Tun
+	tun           tun.TunConn
 }
 
 func (pc *PeerConnector) GetDtlsConfig() *dtls.Config {
@@ -53,7 +53,7 @@ func (pc *PeerConnector) AmServer(other netaddr.IPPort) bool {
 	}
 }
 
-func NewPeerConnector(insideIp netaddr.IP, peerListener net.Listener, peerDialer PeerDialer, store *PeerConnStore, tun *tun.Tun) PeerConnector {
+func NewPeerConnector(insideIp netaddr.IP, peerListener net.Listener, peerDialer PeerDialer, store *PeerConnStore, tun tun.TunConn) PeerConnector {
 	return PeerConnector{
 		listener:   peerListener,
 		dialer:     peerDialer,
