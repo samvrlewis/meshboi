@@ -11,8 +11,9 @@ import (
 )
 
 type rollodex struct {
-	conn     *net.UDPConn
-	networks map[string]*meshNetwork
+	conn         *net.UDPConn
+	networks     map[string]*meshNetwork
+	sendInterval time.Duration
 }
 
 const TimeOutSecs = 30
@@ -50,9 +51,10 @@ func (r *rollodex) getNetwork(networkName string) *meshNetwork {
 	return network
 }
 
-func NewRollodex(conn *net.UDPConn) (*rollodex, error) {
+func NewRollodex(conn *net.UDPConn, sendInterval time.Duration) (*rollodex, error) {
 	rollo := &rollodex{}
 	rollo.conn = conn
+	rollo.sendInterval = sendInterval
 	rollo.networks = make(map[string]*meshNetwork)
 
 	return rollo, nil
@@ -108,7 +110,7 @@ func (mesh *meshNetwork) timeOutInactiveMembers() {
 // Serve sends out messages to each member so that they're aware of other members they can connect to
 // It also serves as a heart beat of sorts from the rollodex to the member
 func (mesh *meshNetwork) Serve() {
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(mesh.rollo.sendInterval)
 	quit := make(chan int)
 	for {
 		select {
