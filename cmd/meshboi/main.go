@@ -92,7 +92,7 @@ func main() {
 			log.Fatalln("Error starting listener ", err)
 		}
 
-		rollo, err := meshboi.NewRollodex(conn, 5*time.Second)
+		rollo, err := meshboi.NewRollodex(conn, 5*time.Second, 30*time.Second)
 
 		if err != nil {
 			log.Fatalln("Error creating rollodex ", err)

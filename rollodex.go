@@ -11,9 +11,10 @@ import (
 )
 
 type rollodex struct {
-	conn         *net.UDPConn
-	networks     map[string]*meshNetwork
-	sendInterval time.Duration
+	conn            *net.UDPConn
+	networks        map[string]*meshNetwork
+	sendInterval    time.Duration
+	timeOutDuration time.Duration
 }
 
 const TimeOutSecs = 30
@@ -51,10 +52,11 @@ func (r *rollodex) getNetwork(networkName string) *meshNetwork {
 	return network
 }
 
-func NewRollodex(conn *net.UDPConn, sendInterval time.Duration) (*rollodex, error) {
+func NewRollodex(conn *net.UDPConn, sendInterval time.Duration, timeOutDuration time.Duration) (*rollodex, error) {
 	rollo := &rollodex{}
 	rollo.conn = conn
 	rollo.sendInterval = sendInterval
+	rollo.timeOutDuration = timeOutDuration
 	rollo.networks = make(map[string]*meshNetwork)
 
 	return rollo, nil
@@ -98,7 +100,7 @@ func (mesh *meshNetwork) timeOutInactiveMembers() {
 	for member := range mesh.members {
 		timeSinceLastActive := now.Sub(mesh.members[member])
 
-		if timeSinceLastActive.Seconds() > TimeOutSecs {
+		if timeSinceLastActive > mesh.rollo.timeOutDuration {
 			log.WithFields(log.Fields{
 				"address": member.IP,
 			}).Info("Removing member due to timeout")
