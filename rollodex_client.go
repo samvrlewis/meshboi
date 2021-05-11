@@ -36,12 +36,11 @@ func NewRollodexClient(networkName string, conn net.Conn, sendRate time.Duration
 func (c *RollodexClient) Run() {
 	go c.readLoop()
 	go c.sendLoop()
-
+	c.wg.Add(2)
 	c.wg.Wait()
 }
 
 func (c *RollodexClient) readLoop() {
-	c.wg.Add(1)
 	defer c.wg.Done()
 
 	buf := make([]byte, 65535)
@@ -70,7 +69,6 @@ func (c *RollodexClient) readLoop() {
 }
 
 func (c *RollodexClient) sendLoop() {
-	c.wg.Add(1)
 	defer c.wg.Done()
 
 	ticker := time.NewTicker(c.sendRate)
