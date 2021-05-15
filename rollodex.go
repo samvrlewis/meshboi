@@ -24,17 +24,22 @@ type meshNetwork struct {
 	members     map[netaddr.IPPort]time.Time
 	membersLock sync.RWMutex
 	rollo       *rollodex
+	newMember   chan struct{}
 }
 
 func (m *meshNetwork) register(addr netaddr.IPPort) {
 	m.membersLock.Lock()
 	defer m.membersLock.Unlock()
 
-	log.WithFields(log.Fields{
-		"address": addr,
-	}).Info("Registering new mesh member")
-
+	_, ok := m.members[addr]
 	m.members[addr] = time.Now()
+
+	if !ok {
+		log.WithFields(log.Fields{
+			"address": addr,
+		}).Info("Registering new mesh member")
+		m.newMember <- struct{}{}
+	}
 }
 
 func (r *rollodex) getNetwork(networkName string) *meshNetwork {
@@ -45,6 +50,7 @@ func (r *rollodex) getNetwork(networkName string) *meshNetwork {
 	network := &meshNetwork{}
 	network.members = make(map[netaddr.IPPort]time.Time)
 	network.rollo = r
+	network.newMember = make(chan struct{})
 	r.networks[networkName] = network
 
 	go network.Serve()
@@ -115,13 +121,19 @@ func (mesh *meshNetwork) Serve() {
 	ticker := time.NewTicker(mesh.rollo.sendInterval)
 	quit := make(chan int)
 	for {
+		// Send out an update both periodically, and on the event of a new member joining
 		select {
 		case <-ticker.C:
+			break
+		case <-mesh.newMember:
 			break
 		case <-quit:
 			ticker.Stop()
 			return
 		}
+
+		// reset the ticker in case we're sending an update due to a new member joining
+		ticker.Reset(mesh.rollo.sendInterval)
 
 		mesh.timeOutInactiveMembers()
 
