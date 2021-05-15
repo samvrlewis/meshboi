@@ -5,8 +5,6 @@ import (
 
 	"inet.af/netaddr"
 
-	"github.com/samvrlewis/meshboi/tun"
-
 	log "github.com/sirupsen/logrus"
 )
 
@@ -14,7 +12,7 @@ type PeerConnector struct {
 	store          *PeerConnStore
 	listenerDialer VpnMeshListenerDialer
 	myOutsideAddr  netaddr.IPPort
-	tun            tun.TunConn
+	tun            TunConn
 }
 
 // Simple comparison to see if this member should be the server or if the remote member should be
@@ -39,7 +37,7 @@ func (pc *PeerConnector) AmServer(other netaddr.IPPort) bool {
 	}
 }
 
-func NewPeerConnector(listenerDialer VpnMeshListenerDialer, store *PeerConnStore, tun tun.TunConn) PeerConnector {
+func NewPeerConnector(listenerDialer VpnMeshListenerDialer, store *PeerConnStore, tun TunConn) PeerConnector {
 	return PeerConnector{
 		listenerDialer: listenerDialer,
 		store:          store,

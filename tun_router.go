@@ -4,18 +4,16 @@ import (
 	"golang.org/x/net/ipv4"
 	"inet.af/netaddr"
 
-	"github.com/samvrlewis/meshboi/tun"
-
 	log "github.com/sirupsen/logrus"
 )
 
 type TunRouter struct {
-	tun   tun.TunConn
+	tun   TunConn
 	store *PeerConnStore
 	quit  chan struct{}
 }
 
-func NewTunRouter(tun tun.TunConn, store *PeerConnStore) TunRouter {
+func NewTunRouter(tun TunConn, store *PeerConnStore) TunRouter {
 	return TunRouter{
 		tun:   tun,
 		store: store,

@@ -4,7 +4,6 @@ import (
 	"net"
 	"time"
 
-	"github.com/samvrlewis/meshboi/tun"
 	log "github.com/sirupsen/logrus"
 	"inet.af/netaddr"
 )
@@ -17,7 +16,7 @@ type MeshboiClient struct {
 }
 
 func NewMeshBoiClient(tunName string, vpnIpPrefix netaddr.IPPrefix, rollodexIP netaddr.IP, rollodexPort int, meshPSK []byte) (*MeshboiClient, error) {
-	tun, err := tun.NewTun(tunName)
+	tun, err := NewTun(tunName)
 
 	if err != nil {
 		log.Error("Error creating tun: ", err)
