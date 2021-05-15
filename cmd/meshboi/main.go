@@ -22,6 +22,7 @@ func main() {
 	tunIP := clientCommand.String("tun-ip", "192.168.50.2/24", "The IP address to assign to the tunnel")
 	serverIP := clientCommand.String("server-ip", "127.0.0.1", "The IP address of the meshboi server")
 	serverPort := clientCommand.Int("server-port", 12345, "The port of the server")
+	psk := clientCommand.String("psk", "", "The pre shared key to use (should be the same on all members in the mesh")
 
 	if len(os.Args) < 2 {
 		log.Fatalln("'server' or 'client' subcommand is required")
@@ -38,7 +39,12 @@ func main() {
 	}
 
 	if clientCommand.Parsed() {
-		mc, err := meshboi.NewMeshBoiClient(*tunName, *tunIP, net.ParseIP(*serverIP), *serverPort, []byte{0xAA, 0xBB})
+		if *psk == "" {
+			log.Error("psk argument not set. Please set with a secure password")
+			clientCommand.PrintDefaults()
+			os.Exit(1)
+		}
+		mc, err := meshboi.NewMeshBoiClient(*tunName, *tunIP, net.ParseIP(*serverIP), *serverPort, []byte(*psk))
 
 		if err != nil {
 			log.Fatalln("Error starting mesh client ", err)
