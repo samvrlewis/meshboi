@@ -2,7 +2,6 @@ package meshboi
 
 import (
 	"io"
-	"log"
 	"os"
 	"os/exec"
 	"strconv"
@@ -31,14 +30,11 @@ type TunConn interface {
 
 //https://www.kernel.org/doc/Documentation/networking/tuntap.txt
 func NewTun(name string) (*Tun, error) {
-	//todo: Why not just replace this with /sbin/ip calls?
-	log.Println("making a tun")
 	tunFile, err := os.OpenFile("/dev/net/tun", os.O_RDWR, 0)
 
 	if err != nil {
 		return nil, err
 	}
-	log.Println("no errors")
 	req := ifReq{}
 	req.Flags = IFF_TUN | IFF_NO_PI
 	copy(req.Name[:], name)
