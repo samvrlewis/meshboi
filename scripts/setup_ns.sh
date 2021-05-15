@@ -28,8 +28,8 @@ ip netns exec blue ip link set lo up
 ip netns exec green ip link set lo up
 
 ip netns exec blue ./meshboi rollodex -server-ip 10.1.1.1 &
-ip netns exec blue ./meshboi client -server-ip 10.1.1.1 -tun-ip 192.168.50.1/24 -psk testpassword &
-ip netns exec green ./meshboi client -server-ip 10.1.1.1 -tun-ip 192.168.50.2/24 -psk testpassword &
+ip netns exec blue ./meshboi client -rollodex-ip 10.1.1.1 -vpn-ip 192.168.50.1/24 -psk testpassword &
+ip netns exec green ./meshboi client -rollodex-ip 10.1.1.1 -vpn-ip 192.168.50.2/24 -psk testpassword &
 
 sleep 30
 
