@@ -16,48 +16,61 @@ type MeshboiClient struct {
 	peerConnector PeerConnector
 }
 
-func NewMeshBoiClient(tunName string, tunIP string, serverIP net.IP, serverPort int) *MeshboiClient {
+func NewMeshBoiClient(tunName string, tunIP string, serverIP net.IP, serverPort int, psk []byte) (*MeshboiClient, error) {
 	tun, err := tun.NewTun(tunName)
 
 	if err != nil {
-		log.Fatalln("Error creating tun: ", err)
+		log.Error("Error creating tun: ", err)
+		return nil, err
 	}
 
 	if err := tun.SetLinkUp(); err != nil {
-		log.Fatalln("Error setting TUN link up: ", err)
+		log.Error("Error setting TUN link up: ", err)
+		return nil, err
 	}
 
 	if err := tun.SetNetwork(tunIP); err != nil {
-		log.Fatalln("Error setting network: ", err)
+		log.Error("Error setting network: ", err)
+		return nil, err
 	}
 
 	if err := tun.SetMtu(1500); err != nil {
-		log.Fatalln("Error setting network: ", err)
+		log.Error("Error setting network: ", err)
+		return nil, err
+	}
+
+	vpnIpPrefix, err := netaddr.ParseIPPrefix(tunIP)
+	if err != nil {
+		log.Error("Error parsing vpn IP ", err)
+		return nil, err
 	}
 
 	listenAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0")}
+	dtlsConfig := getDtlsConfig(vpnIpPrefix.IP, psk)
 
-	multiplexConn, err := NewMultiplexedDTLSConn(listenAddr)
+	multiplexConn, err := NewMultiplexedDTLSConn(listenAddr, dtlsConfig)
 
 	if err != nil {
-		log.Fatalln("Error creating multiplexed conn ", err)
+		log.Error("Error creating multiplexed conn ", err)
+		return nil, err
 	}
 
 	rollodexAddr := &net.UDPAddr{IP: serverIP, Port: serverPort}
-	rollodexConn, err := multiplexConn.GetDialer().Dial(rollodexAddr)
+	rollodexConn, err := multiplexConn.Dial(rollodexAddr)
 
 	if err != nil {
-		log.Fatalln("Error connecting to rollodex server")
+		log.Error("Error connecting to rollodex server")
+		return nil, err
 	}
 
 	mc := MeshboiClient{}
 
 	mc.peerStore = NewPeerConnStore()
-	mc.peerConnector = NewPeerConnector(netaddr.MustParseIPPrefix(tunIP).IP, multiplexConn.GetListener(), multiplexConn.GetDialer(), mc.peerStore, tun)
+	mc.peerConnector = NewPeerConnector(multiplexConn, mc.peerStore, tun)
 	mc.rolloClient = NewRollodexClient("samsNetwork", rollodexConn, time.Duration(5*time.Second), mc.peerConnector.OnNetworkMapUpdate)
 	mc.tunRouter = NewTunRouter(tun, mc.peerStore)
 
-	return &mc
+	return &mc, nil
 }
 
 func (mc *MeshboiClient) Run() {

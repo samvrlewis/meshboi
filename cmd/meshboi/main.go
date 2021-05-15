@@ -38,7 +38,12 @@ func main() {
 	}
 
 	if clientCommand.Parsed() {
-		mc := meshboi.NewMeshBoiClient(*tunName, *tunIP, net.ParseIP(*serverIP), *serverPort)
+		mc, err := meshboi.NewMeshBoiClient(*tunName, *tunIP, net.ParseIP(*serverIP), *serverPort, []byte{0xAA, 0xBB})
+
+		if err != nil {
+			log.Fatalln("Error starting mesh client ", err)
+		}
+
 		mc.Run()
 	} else if rollodexCommand.Parsed() {
 		addr := &net.UDPAddr{IP: net.ParseIP(*ip), Port: *port}

@@ -5,33 +5,19 @@ import (
 
 	"inet.af/netaddr"
 
-	"github.com/pion/dtls/v2"
 	"github.com/samvrlewis/meshboi/tun"
 
 	log "github.com/sirupsen/logrus"
 )
 
 type PeerConnector struct {
-	store         *PeerConnStore
-	listener      net.Listener
-	dialer        PeerDialer
-	myOutsideAddr netaddr.IPPort
-	myInsideIP    netaddr.IP
-	tun           tun.TunConn
+	store          *PeerConnStore
+	listenerDialer VpnMeshListenerDialer
+	myOutsideAddr  netaddr.IPPort
+	tun            tun.TunConn
 }
 
-func (pc *PeerConnector) GetDtlsConfig() *dtls.Config {
-	return &dtls.Config{
-		PSK: func(hint []byte) ([]byte, error) {
-			return []byte{0xAB, 0xC1, 0x23}, nil
-		},
-		PSKIdentityHint:      []byte(pc.myInsideIP.String()),
-		CipherSuites:         []dtls.CipherSuiteID{dtls.TLS_PSK_WITH_AES_128_CCM_8},
-		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
-	}
-}
-
-// Simple comparison to see if this member should be the DTLS server or if the remote member should be
+// Simple comparison to see if this member should be the server or if the remote member should be
 func (pc *PeerConnector) AmServer(other netaddr.IPPort) bool {
 	ipCompare := pc.myOutsideAddr.IP.Compare(other.IP)
 
@@ -53,13 +39,11 @@ func (pc *PeerConnector) AmServer(other netaddr.IPPort) bool {
 	}
 }
 
-func NewPeerConnector(insideIp netaddr.IP, peerListener net.Listener, peerDialer PeerDialer, store *PeerConnStore, tun tun.TunConn) PeerConnector {
+func NewPeerConnector(listenerDialer VpnMeshListenerDialer, store *PeerConnStore, tun tun.TunConn) PeerConnector {
 	return PeerConnector{
-		listener:   peerListener,
-		dialer:     peerDialer,
-		store:      store,
-		myInsideIP: insideIp,
-		tun:        tun,
+		listenerDialer: listenerDialer,
+		store:          store,
+		tun:            tun,
 	}
 }
 
@@ -69,32 +53,16 @@ func (pc *PeerConnector) OnNetworkMapUpdate(network NetworkMap) {
 }
 
 func (pc *PeerConnector) connectToNewPeer(address netaddr.IPPort) error {
-	conn, err := pc.dialer.Dial(address.UDPAddr())
+	conn, ip, err := pc.listenerDialer.DialMesh(address.UDPAddr())
 
 	if err != nil {
 		return err
 	}
 
-	dtlsConn, err := dtls.Client(conn, pc.GetDtlsConfig())
-
-	if err != nil {
-		conn.Close()
-		return err
-	}
-
-	return pc.OnNewPeerConnection(dtlsConn)
+	return pc.OnNewPeerConnection(conn, ip)
 }
 
-func (pc *PeerConnector) OnNewPeerConnection(conn *dtls.Conn) error {
-	peerIpString := string(conn.ConnectionState().IdentityHint)
-	peerVpnIP, err := netaddr.ParseIP(peerIpString)
-
-	if err != nil {
-		log.Warn("Error parsing tunIP from hint: ", err)
-		conn.Close()
-		return err
-	}
-
+func (pc *PeerConnector) OnNewPeerConnection(conn net.Conn, peerVpnIP *netaddr.IP) error {
 	outsideAddr, err := netaddr.ParseIPPort(conn.RemoteAddr().String())
 
 	if err != nil {
@@ -104,7 +72,7 @@ func (pc *PeerConnector) OnNewPeerConnection(conn *dtls.Conn) error {
 
 	log.Info("Succesfully accepted connection from ", conn.RemoteAddr())
 
-	peer := NewPeerConn(peerVpnIP, outsideAddr, conn, pc.tun)
+	peer := NewPeerConn(*peerVpnIP, outsideAddr, conn, pc.tun)
 
 	pc.store.Add(&peer)
 
@@ -145,21 +113,13 @@ func (pc *PeerConnector) newAddresses(addreses []netaddr.IPPort) {
 
 func (pc *PeerConnector) ListenForPeers() {
 	for {
-		conn, err := pc.listener.Accept()
+		conn, ip, err := pc.listenerDialer.AcceptMesh()
 
 		if err != nil {
 			log.Warn("Error accepting: ", err)
 			continue
 		}
 
-		dtlsConn, err := dtls.Server(conn, pc.GetDtlsConfig())
-
-		if err != nil {
-			log.Warn("Error starting dtls connection: ", err)
-			conn.Close()
-			continue
-		}
-
-		pc.OnNewPeerConnection(dtlsConn)
+		pc.OnNewPeerConnection(conn, ip)
 	}
 }

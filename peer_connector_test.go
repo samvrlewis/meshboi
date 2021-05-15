@@ -7,31 +7,32 @@ import (
 	"inet.af/netaddr"
 )
 
-type testDialer struct {
+type testListenerDialer struct {
 	dialer net.Dialer
 	dialed chan (net.Addr)
 }
 
-func (t *testDialer) Dial(raddr net.Addr) (net.Conn, error) {
+func (t testListenerDialer) DialMesh(raddr net.Addr) (net.Conn, *netaddr.IP, error) {
 	t.dialed <- raddr
 	c, _ := net.Pipe()
-	return c, nil
+	ip := netaddr.MustParseIP("192.168.1.1")
+	return c, &ip, nil
+}
+
+func (t testListenerDialer) AcceptMesh() (net.Conn, *netaddr.IP, error) {
+	return nil, nil, nil
+}
+
+func (t testListenerDialer) Dial(raddr net.Addr) (net.Conn, error) {
+	return nil, nil
 }
 
 func TestPeerConnector(t *testing.T) {
-	listener, err := net.Listen("tcp", "127.0.0.1:3333")
-
-	if err != nil {
-		t.Fatalf("%v", err)
-	}
-
-	td := testDialer{dialed: make(chan net.Addr)}
+	td := testListenerDialer{dialed: make(chan net.Addr)}
 	store := NewPeerConnStore()
 	client, _ := net.Pipe()
 
-	pc := NewPeerConnector(netaddr.MustParseIP("192.168.4.1"), listener, &td, store, client)
-
-	go pc.ListenForPeers()
+	pc := NewPeerConnector(td, store, client)
 
 	nm := NetworkMap{
 		Addresses: []netaddr.IPPort{netaddr.MustParseIPPort("192.168.33.1:3000"),

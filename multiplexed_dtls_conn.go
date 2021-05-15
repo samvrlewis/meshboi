@@ -3,12 +3,23 @@ package meshboi
 import (
 	"net"
 
+	"github.com/pion/dtls/v2"
 	"github.com/pion/dtls/v2/pkg/protocol"
 	"github.com/pion/dtls/v2/pkg/protocol/recordlayer"
 	"github.com/samvrlewis/udp"
+	log "github.com/sirupsen/logrus"
+	"inet.af/netaddr"
 )
 
-type PeerDialer interface {
+// VpnListenerDialer allows for:
+// 	- Dialing connections to other members in the VPN Mesh
+//	- Accepting connections to other members in the VPN Mesh
+// 	- Dialing connections to non VPN Mesh members
+type VpnMeshListenerDialer interface {
+	// Returns the connection and the VPN IP address on the other side
+	AcceptMesh() (net.Conn, *netaddr.IP, error)
+	// Returns the connection and the VPN IP address on the other side
+	DialMesh(raddr net.Addr) (net.Conn, *netaddr.IP, error)
 	Dial(raddr net.Addr) (net.Conn, error)
 }
 
@@ -16,9 +27,10 @@ type PeerDialer interface {
 // and also dial new UDP connections (both DTLS and non-DTLS) from the same udp address
 type MultiplexedDTLSConn struct {
 	listener *udp.Listener
+	config   *dtls.Config
 }
 
-func NewMultiplexedDTLSConn(laddr *net.UDPAddr) (*MultiplexedDTLSConn, error) {
+func NewMultiplexedDTLSConn(laddr *net.UDPAddr, config *dtls.Config) (*MultiplexedDTLSConn, error) {
 	// Set a listen config so that we only accept incoming connections that are DTLS connections
 	lc := udp.ListenConfig{
 		AcceptFilter: func(packet []byte) bool {
@@ -42,13 +54,58 @@ func NewMultiplexedDTLSConn(laddr *net.UDPAddr) (*MultiplexedDTLSConn, error) {
 
 	return &MultiplexedDTLSConn{
 		listener: listener.(*udp.Listener),
+		config:   config,
 	}, nil
 }
 
-func (mc *MultiplexedDTLSConn) GetListener() net.Listener {
-	return mc.listener
+func (mc *MultiplexedDTLSConn) startDtlsConn(conn net.Conn, isServer bool) (net.Conn, *netaddr.IP, error) {
+	var dtlsConn *dtls.Conn
+	var err error
+
+	if isServer {
+		dtlsConn, err = dtls.Server(conn, mc.config)
+	} else {
+		dtlsConn, err = dtls.Client(conn, mc.config)
+	}
+
+	if err != nil {
+		log.Warn("Error starting dtls connection: ", err)
+		conn.Close()
+		return nil, nil, err
+	}
+
+	peerIpString := string(dtlsConn.ConnectionState().IdentityHint)
+	peerVpnIP, err := netaddr.ParseIP(peerIpString)
+
+	if err != nil {
+		log.Warn("Couldn't parse peers vpn IP")
+		return nil, nil, err
+	}
+
+	return dtlsConn, &peerVpnIP, nil
 }
 
-func (mc *MultiplexedDTLSConn) GetDialer() PeerDialer {
-	return mc.listener
+func (mc *MultiplexedDTLSConn) AcceptMesh() (net.Conn, *netaddr.IP, error) {
+	conn, err := mc.listener.Accept()
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mc.startDtlsConn(conn, true)
+
+}
+
+func (mc *MultiplexedDTLSConn) DialMesh(raddr net.Addr) (net.Conn, *netaddr.IP, error) {
+	conn, err := mc.listener.Dial(raddr)
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mc.startDtlsConn(conn, false)
+}
+
+func (mc *MultiplexedDTLSConn) Dial(raddr net.Addr) (net.Conn, error) {
+	return mc.listener.Dial(raddr)
 }
