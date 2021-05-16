@@ -73,13 +73,6 @@ func (c *RollodexClient) sendLoop() {
 
 	ticker := time.NewTicker(c.sendRate)
 	for {
-		select {
-		case <-c.quit:
-			return
-		case <-ticker.C:
-			break
-		}
-
 		heartbeat := HeartbeatMessage{NetworkName: c.networkName}
 		b, err := json.Marshal(heartbeat)
 		if err != nil {
@@ -90,6 +83,13 @@ func (c *RollodexClient) sendLoop() {
 
 		if err != nil {
 			log.Error("Error sending heartbeat over the rollo conn: ", err)
+		}
+
+		select {
+		case <-c.quit:
+			return
+		case <-ticker.C:
+			break
 		}
 	}
 }
