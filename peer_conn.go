@@ -51,9 +51,6 @@ func (p *PeerConn) readLoop() {
 		}
 
 		p.lastContacted = time.Now()
-
-		log.Info("Got message: ", b[:n])
-
 		written, err := p.tun.Write(b[:n])
 
 		if err != nil {
@@ -70,9 +67,6 @@ func (p *PeerConn) readLoop() {
 func (p *PeerConn) sendLoop() {
 	for {
 		data := <-p.outgoing
-
-		log.Info("Going to send to peer")
-		log.Info("Sending message: ", data)
 		n, err := p.conn.Write(data)
 
 		if err != nil {
