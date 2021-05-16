@@ -17,10 +17,24 @@ import (
 // 	- Dialing connections to non VPN Mesh members
 type VpnMeshListenerDialer interface {
 	// Returns the connection and the VPN IP address on the other side
-	AcceptMesh() (net.Conn, *netaddr.IP, error)
+	AcceptMesh() (MeshConn, error)
 	// Returns the connection and the VPN IP address on the other side
-	DialMesh(raddr net.Addr) (net.Conn, *netaddr.IP, error)
+	DialMesh(raddr net.Addr) (MeshConn, error)
 	Dial(raddr net.Addr) (net.Conn, error)
+}
+
+type MeshConn interface {
+	net.Conn
+	RemoteMeshAddr() netaddr.IP
+}
+
+type meshConn struct {
+	net.Conn
+	remoteMeshAddr netaddr.IP
+}
+
+func (m *meshConn) RemoteMeshAddr() netaddr.IP {
+	return m.remoteMeshAddr
 }
 
 // MultiplexedDTLSConn represents a conn that can be used to listen for new incoming DTLS connections
@@ -58,7 +72,7 @@ func NewMultiplexedDTLSConn(laddr *net.UDPAddr, config *dtls.Config) (*Multiplex
 	}, nil
 }
 
-func (mc *MultiplexedDTLSConn) startDtlsConn(conn net.Conn, isServer bool) (net.Conn, *netaddr.IP, error) {
+func (mc *MultiplexedDTLSConn) startDtlsConn(conn net.Conn, isServer bool) (MeshConn, error) {
 	var dtlsConn *dtls.Conn
 	var err error
 
@@ -71,7 +85,7 @@ func (mc *MultiplexedDTLSConn) startDtlsConn(conn net.Conn, isServer bool) (net.
 	if err != nil {
 		log.Warn("Error starting dtls connection: ", err)
 		conn.Close()
-		return nil, nil, err
+		return nil, err
 	}
 
 	peerIpString := string(dtlsConn.ConnectionState().IdentityHint)
@@ -79,28 +93,30 @@ func (mc *MultiplexedDTLSConn) startDtlsConn(conn net.Conn, isServer bool) (net.
 
 	if err != nil {
 		log.Warn("Couldn't parse peers vpn IP")
-		return nil, nil, err
+		return nil, err
 	}
 
-	return dtlsConn, &peerVpnIP, nil
+	return &meshConn{Conn: dtlsConn,
+		remoteMeshAddr: peerVpnIP,
+	}, nil
 }
 
-func (mc *MultiplexedDTLSConn) AcceptMesh() (net.Conn, *netaddr.IP, error) {
+func (mc *MultiplexedDTLSConn) AcceptMesh() (MeshConn, error) {
 	conn, err := mc.listener.Accept()
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	return mc.startDtlsConn(conn, true)
 
 }
 
-func (mc *MultiplexedDTLSConn) DialMesh(raddr net.Addr) (net.Conn, *netaddr.IP, error) {
+func (mc *MultiplexedDTLSConn) DialMesh(raddr net.Addr) (MeshConn, error) {
 	conn, err := mc.listener.Dial(raddr)
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	return mc.startDtlsConn(conn, false)

@@ -12,15 +12,18 @@ type testListenerDialer struct {
 	dialed chan (net.Addr)
 }
 
-func (t testListenerDialer) DialMesh(raddr net.Addr) (net.Conn, *netaddr.IP, error) {
+func (t testListenerDialer) DialMesh(raddr net.Addr) (MeshConn, error) {
 	t.dialed <- raddr
 	c, _ := net.Pipe()
 	ip := netaddr.MustParseIP("192.168.1.1")
-	return c, &ip, nil
+	return &meshConn{
+		Conn:           c,
+		remoteMeshAddr: ip,
+	}, nil
 }
 
-func (t testListenerDialer) AcceptMesh() (net.Conn, *netaddr.IP, error) {
-	return nil, nil, nil
+func (t testListenerDialer) AcceptMesh() (MeshConn, error) {
+	return nil, nil
 }
 
 func (t testListenerDialer) Dial(raddr net.Addr) (net.Conn, error) {

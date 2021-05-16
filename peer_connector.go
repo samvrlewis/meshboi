@@ -1,8 +1,6 @@
 package meshboi
 
 import (
-	"net"
-
 	"inet.af/netaddr"
 
 	log "github.com/sirupsen/logrus"
@@ -51,16 +49,16 @@ func (pc *PeerConnector) OnNetworkMapUpdate(network NetworkMap) {
 }
 
 func (pc *PeerConnector) connectToNewPeer(address netaddr.IPPort) error {
-	conn, ip, err := pc.listenerDialer.DialMesh(address.UDPAddr())
+	conn, err := pc.listenerDialer.DialMesh(address.UDPAddr())
 
 	if err != nil {
 		return err
 	}
 
-	return pc.OnNewPeerConnection(conn, ip)
+	return pc.OnNewPeerConnection(conn)
 }
 
-func (pc *PeerConnector) OnNewPeerConnection(conn net.Conn, peerVpnIP *netaddr.IP) error {
+func (pc *PeerConnector) OnNewPeerConnection(conn MeshConn) error {
 	outsideAddr, err := netaddr.ParseIPPort(conn.RemoteAddr().String())
 
 	if err != nil {
@@ -70,7 +68,7 @@ func (pc *PeerConnector) OnNewPeerConnection(conn net.Conn, peerVpnIP *netaddr.I
 
 	log.Info("Succesfully accepted connection from ", conn.RemoteAddr())
 
-	peer := NewPeerConn(*peerVpnIP, outsideAddr, conn, pc.tun)
+	peer := NewPeerConn(conn.RemoteMeshAddr(), outsideAddr, conn, pc.tun)
 
 	pc.store.Add(&peer)
 
@@ -111,13 +109,13 @@ func (pc *PeerConnector) newAddresses(addreses []netaddr.IPPort) {
 
 func (pc *PeerConnector) ListenForPeers() {
 	for {
-		conn, ip, err := pc.listenerDialer.AcceptMesh()
+		conn, err := pc.listenerDialer.AcceptMesh()
 
 		if err != nil {
 			log.Warn("Error accepting: ", err)
 			continue
 		}
 
-		pc.OnNewPeerConnection(conn, ip)
+		pc.OnNewPeerConnection(conn)
 	}
 }
