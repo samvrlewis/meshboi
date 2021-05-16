@@ -32,4 +32,4 @@ jobs:
     - uses: actions/checkout@v2
     
     - name: Integration test
-      run: ./scripts/setup_ns.sh
+      run: ./scripts/smoketest.sh

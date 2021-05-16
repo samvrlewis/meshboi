@@ -31,7 +31,7 @@ ip netns exec blue ./meshboi rollodex -listen-address 10.1.1.1 &
 ip netns exec blue ./meshboi client -rollodex-address 10.1.1.1 -vpn-ip 192.168.50.1/24 -psk testpassword -network testnetwork &
 ip netns exec green ./meshboi client -rollodex-address 10.1.1.1 -vpn-ip 192.168.50.2/24 -psk testpassword -network testnetwork &
 
-sleep 30
+sleep 5
 
 ip netns exec blue ping -c 1 192.168.50.2
 
