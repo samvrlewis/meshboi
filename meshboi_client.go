@@ -15,7 +15,7 @@ type MeshboiClient struct {
 	peerConnector PeerConnector
 }
 
-func NewMeshBoiClient(tunName string, vpnIpPrefix netaddr.IPPrefix, rollodexIP netaddr.IP, rollodexPort int, meshPSK []byte) (*MeshboiClient, error) {
+func NewMeshBoiClient(tunName string, vpnIpPrefix netaddr.IPPrefix, rollodexIP netaddr.IP, rollodexPort int, networkName string, meshPSK []byte) (*MeshboiClient, error) {
 	tun, err := NewTun(tunName)
 
 	if err != nil {
@@ -60,7 +60,7 @@ func NewMeshBoiClient(tunName string, vpnIpPrefix netaddr.IPPrefix, rollodexIP n
 
 	mc.peerStore = NewPeerConnStore()
 	mc.peerConnector = NewPeerConnector(multiplexConn, mc.peerStore, tun)
-	mc.rolloClient = NewRollodexClient("samsNetwork", rollodexConn, time.Duration(5*time.Second), mc.peerConnector.OnNetworkMapUpdate)
+	mc.rolloClient = NewRollodexClient(networkName, rollodexConn, time.Duration(5*time.Second), mc.peerConnector.OnNetworkMapUpdate)
 	mc.tunRouter = NewTunRouter(tun, mc.peerStore)
 
 	return &mc, nil
