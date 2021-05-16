@@ -12,18 +12,20 @@ import (
 	"inet.af/netaddr"
 )
 
+const defaultPort = 6264 // "mboi" on a telelphone dialpad :)
+
 func main() {
 
 	rollodexCommand := flag.NewFlagSet("rollodex", flag.ExitOnError) // "address book?" "rollodex?"
 	ip := rollodexCommand.String("server-ip", "127.0.0.1", "The IP address of the meshboi server")
-	port := rollodexCommand.Int("server-port", 12345, "The port of the server")
+	port := rollodexCommand.Int("server-port", defaultPort, "The port of the server")
 
 	clientCommand := flag.NewFlagSet("client", flag.ExitOnError)
 	networkName := clientCommand.String("network", "", "The unique network name that identifies the mesh (should be the same on all members in the mesh)")
 	tunName := clientCommand.String("tun-name", "tun", "The name to assign to the tun adapter")
 	vpnIPPrefixString := clientCommand.String("vpn-ip", "192.168.50.2/24", "The IP address (with subnet) to assign to the tunnel")
 	rollodexIPString := clientCommand.String("rollodex-ip", "127.0.0.1", "The IP address of the meshboi server")
-	rollodexPort := clientCommand.Int("rollodex-port", 12345, "The port of the server")
+	rollodexPort := clientCommand.Int("rollodex-port", defaultPort, "The port of the server")
 	psk := clientCommand.String("psk", "", "The pre shared key to use (should be the same on all members in the mesh)")
 
 	if len(os.Args) < 2 {
