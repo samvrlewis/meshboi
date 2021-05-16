@@ -29,10 +29,9 @@ type meshNetwork struct {
 
 func (m *meshNetwork) register(addr netaddr.IPPort) {
 	m.membersLock.Lock()
-	defer m.membersLock.Unlock()
-
 	_, ok := m.members[addr]
 	m.members[addr] = time.Now()
+	m.membersLock.Unlock()
 
 	if !ok {
 		log.WithFields(log.Fields{
