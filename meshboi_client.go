@@ -15,29 +15,7 @@ type MeshboiClient struct {
 	peerConnector PeerConnector
 }
 
-func NewMeshBoiClient(tunName string, vpnIpPrefix netaddr.IPPrefix, rollodexIP netaddr.IP, rollodexPort int, networkName string, meshPSK []byte) (*MeshboiClient, error) {
-	tun, err := NewTun(tunName)
-
-	if err != nil {
-		log.Error("Error creating tun: ", err)
-		return nil, err
-	}
-
-	if err := tun.SetLinkUp(); err != nil {
-		log.Error("Error setting TUN link up: ", err)
-		return nil, err
-	}
-
-	if err := tun.SetNetwork(vpnIpPrefix.String()); err != nil {
-		log.Error("Error setting network: ", err)
-		return nil, err
-	}
-
-	if err := tun.SetMtu(1500); err != nil {
-		log.Error("Error setting network: ", err)
-		return nil, err
-	}
-
+func NewMeshBoiClient(tun TunConn, vpnIpPrefix netaddr.IPPrefix, rollodexIP netaddr.IP, rollodexPort int, networkName string, meshPSK []byte) (*MeshboiClient, error) {
 	listenAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0")}
 	dtlsConfig := getDtlsConfig(vpnIpPrefix.IP, meshPSK)
 

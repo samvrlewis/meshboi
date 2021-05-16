@@ -57,8 +57,10 @@ func main() {
 
 		vpnIPPrefix, err := netaddr.ParseIPPrefix(*vpnIPPrefixString)
 
+		tun, err := meshboi.NewTunWithConfig(*tunName, vpnIPPrefix.String(), 1500)
+
 		if err != nil {
-			log.Fatalln("Error parsing vpn-ip ", err)
+			log.Fatalln("Error creating tun: ", err)
 		}
 
 		rollodexStdIP, err := net.ResolveIPAddr("ip", *rollodexAddr)
@@ -73,7 +75,7 @@ func main() {
 			log.Fatalln("Error converting to netaddr IP")
 		}
 
-		mc, err := meshboi.NewMeshBoiClient(*tunName, vpnIPPrefix, rollodexIP, *rollodexPort, *networkName, []byte(*psk))
+		mc, err := meshboi.NewMeshBoiClient(tun, vpnIPPrefix, rollodexIP, *rollodexPort, *networkName, []byte(*psk))
 
 		if err != nil {
 			log.Fatalln("Error starting mesh client ", err)

@@ -53,6 +53,29 @@ func NewTun(name string) (*Tun, error) {
 	return &tun, nil
 }
 
+// Makes a Tun with the desired config and immediately sets it up
+func NewTunWithConfig(name string, ip string, mtu int) (*Tun, error) {
+	tun, err := NewTun(name)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if err := tun.SetNetwork(ip); err != nil {
+		return nil, err
+	}
+
+	if err := tun.SetMtu(mtu); err != nil {
+		return nil, err
+	}
+
+	if err := tun.SetLinkUp(); err != nil {
+		return nil, err
+	}
+
+	return tun, nil
+}
+
 func (t Tun) SetLinkUp() error {
 	cmd := exec.Command("/sbin/ip", "link", "set", t.Name, "up")
 
