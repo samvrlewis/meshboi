@@ -24,7 +24,7 @@ func main() {
 	networkName := clientCommand.String("network", "", "The unique network name that identifies the mesh (should be the same on all members in the mesh)")
 	tunName := clientCommand.String("tun-name", "tun", "The name to assign to the tun adapter")
 	vpnIPPrefixString := clientCommand.String("vpn-ip", "192.168.50.2/24", "The IP address (with subnet) to assign to the tunnel")
-	rollodexIPString := clientCommand.String("rollodex-ip", "127.0.0.1", "The IP address of the meshboi server")
+	rollodexAddr := clientCommand.String("rollodex-address", "rollodex.samlewis.me", "The IP address of the meshboi server")
 	rollodexPort := clientCommand.Int("rollodex-port", defaultPort, "The port of the server")
 	psk := clientCommand.String("psk", "", "The pre shared key to use (should be the same on all members in the mesh)")
 
@@ -61,10 +61,16 @@ func main() {
 			log.Fatalln("Error parsing vpn-ip ", err)
 		}
 
-		rollodexIP, err := netaddr.ParseIP(*rollodexIPString)
+		rollodexStdIP, err := net.ResolveIPAddr("ip", *rollodexAddr)
 
 		if err != nil {
-			log.Fatalln("Error parsing rollodex-ip ", err)
+			log.Fatalln("Error parsing rollodex-address ", err)
+		}
+
+		rollodexIP, ok := netaddr.FromStdIP(rollodexStdIP.IP)
+
+		if !ok {
+			log.Fatalln("Error converting to netaddr IP")
 		}
 
 		mc, err := meshboi.NewMeshBoiClient(*tunName, vpnIPPrefix, rollodexIP, *rollodexPort, *networkName, []byte(*psk))
