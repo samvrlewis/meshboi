@@ -95,6 +95,6 @@ func (c *RollodexClient) sendLoop() {
 }
 
 func (c *RollodexClient) Stop() {
-	c.quit <- true
 	c.conn.Close()
+	c.quit <- true
 }
