@@ -16,9 +16,9 @@ const defaultPort = 6264 // "mboi" on a telelphone dialpad :)
 
 func main() {
 
-	rollodexCommand := flag.NewFlagSet("rollodex", flag.ExitOnError) // "address book?" "rollodex?"
-	ip := rollodexCommand.String("server-ip", "127.0.0.1", "The IP address of the meshboi server")
-	port := rollodexCommand.Int("server-port", defaultPort, "The port of the server")
+	rollodexCommand := flag.NewFlagSet("rollodex", flag.ExitOnError)
+	ip := rollodexCommand.String("listen-address", "0.0.0.0", "The IP address for the rollodex to listen on")
+	port := rollodexCommand.Int("listen-port", defaultPort, "The port of for the rollodex to listen on")
 
 	clientCommand := flag.NewFlagSet("client", flag.ExitOnError)
 	networkName := clientCommand.String("network", "", "The unique network name that identifies the mesh (should be the same on all members in the mesh)")
