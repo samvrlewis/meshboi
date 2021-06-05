@@ -1,6 +1,8 @@
 package meshboi
 
 import (
+	"net"
+
 	"golang.org/x/net/ipv4"
 	"inet.af/netaddr"
 
@@ -25,9 +27,14 @@ func (tr *TunRouter) Run() {
 
 	for {
 		n, err := tr.tun.Read(packet)
-		if err != nil {
-			log.Error("Error reading from tun device: ", err)
+		if nerr, ok := err.(net.Error); ok && nerr.Temporary() {
+			log.Warn("Temporary error reading from tun device, continuing: ", nerr)
 			continue
+		}
+
+		if err != nil {
+			log.Fatalln("Serious error reading from tun device: ", err)
+			break
 		}
 
 		header, err := ipv4.ParseHeader(packet[:n])
@@ -47,7 +54,7 @@ func (tr *TunRouter) Run() {
 		peer, ok := tr.store.GetByInsideIp(vpnIP)
 
 		if !ok {
-			log.Info("Dropping data destined for ", vpnIP)
+			log.Warn("Dropping data destined for ", vpnIP)
 			continue
 		}
 
