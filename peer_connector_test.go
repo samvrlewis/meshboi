@@ -27,7 +27,8 @@ func (t testListenerDialer) AcceptMesh() (MeshConn, error) {
 }
 
 func (t testListenerDialer) Dial(raddr net.Addr) (net.Conn, error) {
-	return nil, nil
+	fakeConn, _ := net.Pipe()
+	return fakeConn, nil
 }
 
 func TestPeerConnector(t *testing.T) {

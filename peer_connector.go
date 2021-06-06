@@ -1,6 +1,9 @@
 package meshboi
 
 import (
+	"net"
+	"time"
+
 	"inet.af/netaddr"
 
 	log "github.com/sirupsen/logrus"
@@ -48,7 +51,47 @@ func (pc *PeerConnector) OnNetworkMapUpdate(network NetworkMap) {
 	pc.newAddresses(network.Addresses)
 }
 
+func (pc *PeerConnector) readAllFromAddr(address net.Addr, timeout time.Duration) error {
+	conn, err := pc.listenerDialer.Dial(address)
+
+	if err != nil {
+		log.Warn("Error connecting to peer unencrypted ", err)
+		return err
+	}
+
+	defer conn.Close()
+
+	buf := make([]byte, 1024)
+
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	n, err := conn.Read(buf)
+
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			log.Println("Read timeout:", err)
+		} else {
+			log.Println("Read error:", err)
+			return err
+		}
+	} else {
+		log.Info("Read: ", string(buf[:n]))
+	}
+
+	return nil
+}
+
 func (pc *PeerConnector) connectToNewPeer(address netaddr.IPPort) error {
+	// We are going to initiate a dTLS connection to the other mesh member
+	// however, for it to open a hole in its firewall it has sent us an initial
+	// message if we have our own firewall then this message will likely not be
+	// received but if it does get through it can wait here to receive it before
+	// continuing
+	err := pc.readAllFromAddr(address.UDPAddr(), time.Second)
+
+	if err != nil {
+		return err
+	}
+
 	conn, err := pc.listenerDialer.DialMesh(address.UDPAddr())
 
 	if err != nil {
@@ -78,6 +121,29 @@ func (pc *PeerConnector) OnNewPeerConnection(conn MeshConn) error {
 	return nil
 }
 
+func (pc *PeerConnector) openFirewallToPeer(addr net.Addr) error {
+	conn, err := pc.listenerDialer.Dial(addr)
+	defer conn.Close()
+
+	if err != nil {
+		log.Warn("Error connecting to peer unencrypted ", err)
+		return err
+	}
+
+	// It doesn't really matter what is sent here - the important part is
+	// something is sent. We're effectively telling any and all (stateful)
+	// firewalls on our path to the peer to allow any future traffic that has
+	// originated from that peer
+	_, err = conn.Write([]byte("hello"))
+
+	if err != nil {
+		log.Warn("Error writing to peer unencrypted ", err)
+		return err
+	}
+
+	return nil
+}
+
 func (pc *PeerConnector) newAddresses(addreses []netaddr.IPPort) {
 	for _, address := range addreses {
 		_, ok := pc.store.GetByOutsideIpPort(address)
@@ -94,15 +160,27 @@ func (pc *PeerConnector) newAddresses(addreses []netaddr.IPPort) {
 		}
 
 		if pc.AmServer(address) {
-			// the other dude will connect to us
-			continue
-		}
+			peer := NewPeerConn(netaddr.IP{}, address, nil, pc.tun)
+			pc.store.Add(&peer)
 
-		log.Info("Going to try to connect to ", address)
+			// As the peer will initiate connection to our dTLS server we first
+			// need to make sure our firewall(s) are open to allow the peer to
+			// contact us
+			err := pc.openFirewallToPeer(address.UDPAddr())
 
-		if err := pc.connectToNewPeer(address); err != nil {
-			log.Warn("Could not connect to ", address, err)
-			continue
+			if err != nil {
+				log.Warn("Error opening firewall: ", err)
+
+				// Remove the peer so we can try again later
+				pc.store.RemoveByOutsideIPPort(address)
+			}
+		} else {
+			log.Info("Going to try to connect to ", address)
+
+			if err := pc.connectToNewPeer(address); err != nil {
+				log.Warn("Could not connect to ", address, err)
+				continue
+			}
 		}
 	}
 }

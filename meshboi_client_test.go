@@ -69,7 +69,12 @@ func TestTwoClients(t *testing.T) {
 
 	sentMsg := append(header, b...)
 
-	time.Sleep(time.Second)
+	// The connection between the peers takes at least 1 second to create
+	//
+	// todo: It would be much nicer if we could get the client to inform us when
+	// the connection has been made so we could wait on a condition var or channel
+	// instead of needing to sleep here
+	time.Sleep(2 * time.Second)
 	tunIncoming1.Write(sentMsg)
 
 	var rxedMsg []byte
