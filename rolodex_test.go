@@ -7,9 +7,9 @@ import (
 	"time"
 )
 
-func TestRollodex(t *testing.T) {
+func TestRolodex(t *testing.T) {
 	conn, _ := net.ListenUDP("udp", &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 33333})
-	rollo, err := NewRollodex(conn, 1*time.Second, 5*time.Second)
+	rollo, err := NewRolodex(conn, 1*time.Second, 5*time.Second)
 
 	if err != nil {
 		t.FailNow()

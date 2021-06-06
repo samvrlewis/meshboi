@@ -18,7 +18,7 @@ func TestNetworkCallback(t *testing.T) {
 		nmap = member
 	}
 	client, server := net.Pipe()
-	rolloClient := NewRollodexClient("testNet", client, time.Second, callback)
+	rolloClient := NewRolodexClient("testNet", client, time.Second, callback)
 
 	go rolloClient.Run()
 	defer rolloClient.Stop()
@@ -47,7 +47,7 @@ func TestClientSendsHeartBeat(t *testing.T) {
 	callback := func(member NetworkMap) {
 	}
 	client, server := net.Pipe()
-	rolloClient := NewRollodexClient("testNet", client, time.Millisecond, callback)
+	rolloClient := NewRolodexClient("testNet", client, time.Millisecond, callback)
 	go rolloClient.Run()
 	defer rolloClient.Stop()
 

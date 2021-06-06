@@ -19,13 +19,13 @@ func TestTwoClients(t *testing.T) {
 		t.Error("Couldn't make UDP listener: ", err)
 	}
 
-	rollodex, err := NewRollodex(conn, time.Second, time.Minute)
+	rolodex, err := NewRolodex(conn, time.Second, time.Minute)
 
 	if err != nil {
-		t.Error("Couldn't make rollodex: ", err)
+		t.Error("Couldn't make rolodex: ", err)
 	}
 
-	go rollodex.Run()
+	go rolodex.Run()
 
 	// use these as fake tuns
 	// the incoming is the tun to the outside world (ie what other applications would write to)

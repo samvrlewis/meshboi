@@ -11,12 +11,12 @@ import (
 
 type MeshboiClient struct {
 	peerStore     *PeerConnStore
-	rolloClient   RollodexClient
+	rolloClient   RolodexClient
 	tunRouter     TunRouter
 	peerConnector PeerConnector
 }
 
-func NewMeshBoiClient(tun TunConn, vpnIpPrefix netaddr.IPPrefix, rollodexIP netaddr.IP, rollodexPort int, networkName string, meshPSK []byte) (*MeshboiClient, error) {
+func NewMeshBoiClient(tun TunConn, vpnIpPrefix netaddr.IPPrefix, rolodexIP netaddr.IP, rolodexPort int, networkName string, meshPSK []byte) (*MeshboiClient, error) {
 	listenAddr := &net.UDPAddr{IP: net.ParseIP("0.0.0.0")}
 	dtlsConfig := getDtlsConfig(vpnIpPrefix.IP, meshPSK)
 
@@ -27,11 +27,11 @@ func NewMeshBoiClient(tun TunConn, vpnIpPrefix netaddr.IPPrefix, rollodexIP neta
 		return nil, err
 	}
 
-	rollodexAddr := &net.UDPAddr{IP: rollodexIP.IPAddr().IP, Port: rollodexPort}
-	rollodexConn, err := multiplexConn.Dial(rollodexAddr)
+	rolodexAddr := &net.UDPAddr{IP: rolodexIP.IPAddr().IP, Port: rolodexPort}
+	rolodexConn, err := multiplexConn.Dial(rolodexAddr)
 
 	if err != nil {
-		log.Error("Error connecting to rollodex server")
+		log.Error("Error connecting to rolodex server")
 		return nil, err
 	}
 
@@ -39,7 +39,7 @@ func NewMeshBoiClient(tun TunConn, vpnIpPrefix netaddr.IPPrefix, rollodexIP neta
 
 	mc.peerStore = NewPeerConnStore()
 	mc.peerConnector = NewPeerConnector(multiplexConn, mc.peerStore, tun)
-	mc.rolloClient = NewRollodexClient(networkName, rollodexConn, time.Duration(5*time.Second), mc.peerConnector.OnNetworkMapUpdate)
+	mc.rolloClient = NewRolodexClient(networkName, rolodexConn, time.Duration(5*time.Second), mc.peerConnector.OnNetworkMapUpdate)
 	mc.tunRouter = NewTunRouter(tun, mc.peerStore)
 
 	return &mc, nil

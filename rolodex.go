@@ -10,7 +10,7 @@ import (
 	"inet.af/netaddr"
 )
 
-type rollodex struct {
+type rolodex struct {
 	conn            *net.UDPConn
 	networks        map[string]*meshNetwork
 	sendInterval    time.Duration
@@ -23,7 +23,7 @@ type meshNetwork struct {
 	// make of IP address to last seen time
 	members     map[netaddr.IPPort]time.Time
 	membersLock sync.RWMutex
-	rollo       *rollodex
+	rollo       *rolodex
 	newMember   chan struct{}
 }
 
@@ -41,7 +41,7 @@ func (m *meshNetwork) register(addr netaddr.IPPort) {
 	}
 }
 
-func (r *rollodex) getNetwork(networkName string) *meshNetwork {
+func (r *rolodex) getNetwork(networkName string) *meshNetwork {
 	if network, ok := r.networks[networkName]; ok {
 		return network
 	}
@@ -57,8 +57,8 @@ func (r *rollodex) getNetwork(networkName string) *meshNetwork {
 	return network
 }
 
-func NewRollodex(conn *net.UDPConn, sendInterval time.Duration, timeOutDuration time.Duration) (*rollodex, error) {
-	rollo := &rollodex{}
+func NewRolodex(conn *net.UDPConn, sendInterval time.Duration, timeOutDuration time.Duration) (*rolodex, error) {
+	rollo := &rolodex{}
 	rollo.conn = conn
 	rollo.sendInterval = sendInterval
 	rollo.timeOutDuration = timeOutDuration
@@ -67,7 +67,7 @@ func NewRollodex(conn *net.UDPConn, sendInterval time.Duration, timeOutDuration 
 	return rollo, nil
 }
 
-func (r *rollodex) Run() {
+func (r *rolodex) Run() {
 	buf := make([]byte, 65535)
 	for {
 		n, addr, err := r.conn.ReadFromUDP(buf)
@@ -115,7 +115,7 @@ func (mesh *meshNetwork) timeOutInactiveMembers() {
 }
 
 // Serve sends out messages to each member so that they're aware of other members they can connect to
-// It also serves as a heart beat of sorts from the rollodex to the member
+// It also serves as a heart beat of sorts from the rolodex to the member
 func (mesh *meshNetwork) Serve() {
 	ticker := time.NewTicker(mesh.rollo.sendInterval)
 	quit := make(chan int)

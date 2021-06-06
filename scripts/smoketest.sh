@@ -27,9 +27,9 @@ ip netns exec green ip link set dev veth1 up
 ip netns exec blue ip link set lo up
 ip netns exec green ip link set lo up
 
-ip netns exec blue ./meshboi rollodex -listen-address 10.1.1.1 &
-ip netns exec blue ./meshboi client -rollodex-address 10.1.1.1 -vpn-ip 192.168.50.1/24 -psk testpassword -network testnetwork &
-ip netns exec green ./meshboi client -rollodex-address 10.1.1.1 -vpn-ip 192.168.50.2/24 -psk testpassword -network testnetwork &
+ip netns exec blue ./meshboi rolodex -listen-address 10.1.1.1 &
+ip netns exec blue ./meshboi client -rolodex-address 10.1.1.1 -vpn-ip 192.168.50.1/24 -psk testpassword -network testnetwork &
+ip netns exec green ./meshboi client -rolodex-address 10.1.1.1 -vpn-ip 192.168.50.2/24 -psk testpassword -network testnetwork &
 
 sleep 5
 

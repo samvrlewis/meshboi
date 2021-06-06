@@ -1,12 +1,12 @@
 [Unit]
-Description=meshboi rollodex
+Description=meshboi rolodex
 Wants=basic.target
 After=basic.target network.target
 Before=sshd.service
 
 [Service]
 Type=simple
-ExecStart=/usr/local/bin/meshboi rollodex
+ExecStart=/usr/local/bin/meshboi rolodex
 Restart=always
 
 [Install]

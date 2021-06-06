@@ -9,19 +9,19 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type RollodexCallback func(member NetworkMap)
+type RolodexCallback func(member NetworkMap)
 
-type RollodexClient struct {
+type RolodexClient struct {
 	networkName string
 	conn        net.Conn
 	sendRate    time.Duration
-	callback    RollodexCallback
+	callback    RolodexCallback
 	quit        chan bool
 	wg          *sync.WaitGroup
 }
 
-func NewRollodexClient(networkName string, conn net.Conn, sendRate time.Duration, callback RollodexCallback) RollodexClient {
-	client := RollodexClient{
+func NewRolodexClient(networkName string, conn net.Conn, sendRate time.Duration, callback RolodexCallback) RolodexClient {
+	client := RolodexClient{
 		networkName: networkName,
 		conn:        conn,
 		sendRate:    sendRate,
@@ -33,14 +33,14 @@ func NewRollodexClient(networkName string, conn net.Conn, sendRate time.Duration
 	return client
 }
 
-func (c *RollodexClient) Run() {
+func (c *RolodexClient) Run() {
 	go c.readLoop()
 	go c.sendLoop()
 	c.wg.Add(2)
 	c.wg.Wait()
 }
 
-func (c *RollodexClient) readLoop() {
+func (c *RolodexClient) readLoop() {
 	defer c.wg.Done()
 
 	buf := make([]byte, 65535)
@@ -68,7 +68,7 @@ func (c *RollodexClient) readLoop() {
 	}
 }
 
-func (c *RollodexClient) sendLoop() {
+func (c *RolodexClient) sendLoop() {
 	defer c.wg.Done()
 
 	ticker := time.NewTicker(c.sendRate)
@@ -94,7 +94,7 @@ func (c *RollodexClient) sendLoop() {
 	}
 }
 
-func (c *RollodexClient) Stop() {
+func (c *RolodexClient) Stop() {
 	c.conn.Close()
 	c.quit <- true
 }

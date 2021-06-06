@@ -16,16 +16,16 @@ const defaultPort = 6264 // "mboi" on a telelphone dialpad :)
 
 func main() {
 
-	rollodexCommand := flag.NewFlagSet("rollodex", flag.ExitOnError)
-	ip := rollodexCommand.String("listen-address", "0.0.0.0", "The IP address for the rollodex to listen on")
-	port := rollodexCommand.Int("listen-port", defaultPort, "The port of for the rollodex to listen on")
+	rolodexCommand := flag.NewFlagSet("rolodex", flag.ExitOnError)
+	ip := rolodexCommand.String("listen-address", "0.0.0.0", "The IP address for the rolodex to listen on")
+	port := rolodexCommand.Int("listen-port", defaultPort, "The port of for the rolodex to listen on")
 
 	clientCommand := flag.NewFlagSet("client", flag.ExitOnError)
 	networkName := clientCommand.String("network", "", "The unique network name that identifies the mesh (should be the same on all members in the mesh)")
 	tunName := clientCommand.String("tun-name", "tun", "The name to assign to the tun adapter")
 	vpnIPPrefixString := clientCommand.String("vpn-ip", "192.168.50.2/24", "The IP address (with subnet) to assign to the tunnel")
-	rollodexAddr := clientCommand.String("rollodex-address", "rollodex.samlewis.me", "The IP address of the meshboi server")
-	rollodexPort := clientCommand.Int("rollodex-port", defaultPort, "The port of the server")
+	rolodexAddr := clientCommand.String("rolodex-address", "rolodex.samlewis.me", "The IP address of the meshboi server")
+	rolodexPort := clientCommand.Int("rolodex-port", defaultPort, "The port of the server")
 	psk := clientCommand.String("psk", "", "The pre shared key to use (should be the same on all members in the mesh)")
 
 	if len(os.Args) < 2 {
@@ -33,8 +33,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
-	case "rollodex":
-		rollodexCommand.Parse(os.Args[2:])
+	case "rolodex":
+		rolodexCommand.Parse(os.Args[2:])
 	case "client":
 		clientCommand.Parse(os.Args[2:])
 	default:
@@ -63,26 +63,26 @@ func main() {
 			log.Fatalln("Error creating tun: ", err)
 		}
 
-		rollodexStdIP, err := net.ResolveIPAddr("ip", *rollodexAddr)
+		rolodexStdIP, err := net.ResolveIPAddr("ip", *rolodexAddr)
 
 		if err != nil {
-			log.Fatalln("Error parsing rollodex-address ", err)
+			log.Fatalln("Error parsing rolodex-address ", err)
 		}
 
-		rollodexIP, ok := netaddr.FromStdIP(rollodexStdIP.IP)
+		rolodexIP, ok := netaddr.FromStdIP(rolodexStdIP.IP)
 
 		if !ok {
 			log.Fatalln("Error converting to netaddr IP")
 		}
 
-		mc, err := meshboi.NewMeshBoiClient(tun, vpnIPPrefix, rollodexIP, *rollodexPort, *networkName, []byte(*psk))
+		mc, err := meshboi.NewMeshBoiClient(tun, vpnIPPrefix, rolodexIP, *rolodexPort, *networkName, []byte(*psk))
 
 		if err != nil {
 			log.Fatalln("Error starting mesh client ", err)
 		}
 
 		mc.Run()
-	} else if rollodexCommand.Parsed() {
+	} else if rolodexCommand.Parsed() {
 		addr := &net.UDPAddr{IP: net.ParseIP(*ip), Port: *port}
 		conn, err := net.ListenUDP("udp", addr)
 
@@ -90,10 +90,10 @@ func main() {
 			log.Fatalln("Error starting listener ", err)
 		}
 
-		rollo, err := meshboi.NewRollodex(conn, 5*time.Second, 30*time.Second)
+		rollo, err := meshboi.NewRolodex(conn, 5*time.Second, 30*time.Second)
 
 		if err != nil {
-			log.Fatalln("Error creating rollodex ", err)
+			log.Fatalln("Error creating rolodex ", err)
 		}
 		rollo.Run()
 	}
