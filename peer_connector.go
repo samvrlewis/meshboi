@@ -197,3 +197,7 @@ func (pc *PeerConnector) ListenForPeers() {
 		pc.OnNewPeerConnection(conn)
 	}
 }
+
+func (pc *PeerConnector) Stop() {
+	// todo: Properly shut down all the spawned peers
+}

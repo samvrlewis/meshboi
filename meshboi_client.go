@@ -2,6 +2,7 @@ package meshboi
 
 import (
 	"net"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -45,12 +46,30 @@ func NewMeshBoiClient(tun TunConn, vpnIpPrefix netaddr.IPPrefix, rollodexIP neta
 }
 
 func (mc *MeshboiClient) Run() {
-	go mc.tunRouter.Run()
-	go mc.peerConnector.ListenForPeers()
-	go mc.rolloClient.Run()
-	defer mc.rolloClient.Stop()
+	var wg sync.WaitGroup
+	wg.Add(3)
 
-	for {
+	go func() {
+		mc.tunRouter.Run()
+		wg.Done()
+	}()
 
-	}
+	go func() {
+		mc.peerConnector.ListenForPeers()
+		wg.Done()
+	}()
+
+	go func() {
+		mc.rolloClient.Run()
+		wg.Done()
+	}()
+
+	wg.Wait()
+}
+
+func (mc *MeshboiClient) Stop() {
+	mc.rolloClient.Stop()
+	mc.peerConnector.Stop()
+	mc.tunRouter.Stop()
+
 }

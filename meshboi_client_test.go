@@ -46,10 +46,10 @@ func TestTwoClients(t *testing.T) {
 	}
 
 	go client1.Run()
-	//defer client1.Stop()
+	defer client1.Stop()
 
 	go client2.Run()
-	//defer client2.Stop()
+	defer client2.Stop()
 
 	b := []byte("hello how are you?")
 	h := &ipv4.Header{

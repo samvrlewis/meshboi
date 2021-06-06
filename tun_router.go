@@ -10,15 +10,16 @@ import (
 )
 
 type TunRouter struct {
-	tun   TunConn
-	store *PeerConnStore
-	quit  chan struct{}
+	tun     TunConn
+	store   *PeerConnStore
+	stopped bool
 }
 
 func NewTunRouter(tun TunConn, store *PeerConnStore) TunRouter {
 	return TunRouter{
-		tun:   tun,
-		store: store,
+		tun:     tun,
+		store:   store,
+		stopped: false,
 	}
 }
 
@@ -33,7 +34,9 @@ func (tr *TunRouter) Run() {
 		}
 
 		if err != nil {
-			log.Fatalln("Serious error reading from tun device: ", err)
+			if !tr.stopped {
+				log.Fatalln("Serious error reading from tun device: ", err)
+			}
 			break
 		}
 
@@ -66,5 +69,6 @@ func (tr *TunRouter) Run() {
 }
 
 func (tr *TunRouter) Stop() error {
+	tr.stopped = true
 	return tr.tun.Close()
 }
