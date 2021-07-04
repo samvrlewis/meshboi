@@ -17,10 +17,18 @@ jobs:
         go-version: 1.15
 
     - name: Build
-      run: go build -v ./...
+      run: |
+        mkdir artifacts
+        go build -o artifacts -v ./...
 
     - name: Test
       run: go test -v ./...
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: meshboi
+        path: artifacts/meshboi
 
   integration-test:
     container:
