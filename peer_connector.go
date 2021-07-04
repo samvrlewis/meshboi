@@ -150,7 +150,6 @@ func (pc *PeerConnector) newAddresses(addreses []netaddr.IPPort) {
 
 		if ok {
 			// we already know of this peer
-			log.Info("Already connected to ", address)
 			continue
 		}
 
