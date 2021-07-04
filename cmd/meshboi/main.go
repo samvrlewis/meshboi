@@ -23,6 +23,7 @@ func main() {
 	clientCommand := flag.NewFlagSet("client", flag.ExitOnError)
 	networkName := clientCommand.String("network", "", "The unique network name that identifies the mesh (should be the same on all members in the mesh)")
 	tunName := clientCommand.String("tun-name", "tun", "The name to assign to the tun adapter")
+	tunMtu := clientCommand.Int("tun-mtu", 1200, "The MTU of the tun")
 	vpnIPPrefixString := clientCommand.String("vpn-ip", "192.168.50.2/24", "The IP address (with subnet) to assign to the tunnel")
 	rolodexAddr := clientCommand.String("rolodex-address", "rolodex.samlewis.me", "The IP address of the meshboi server")
 	rolodexPort := clientCommand.Int("rolodex-port", defaultPort, "The port of the server")
@@ -57,7 +58,7 @@ func main() {
 
 		vpnIPPrefix, err := netaddr.ParseIPPrefix(*vpnIPPrefixString)
 
-		tun, err := meshboi.NewTunWithConfig(*tunName, vpnIPPrefix.String(), 1500)
+		tun, err := meshboi.NewTunWithConfig(*tunName, vpnIPPrefix.String(), *tunMtu)
 
 		if err != nil {
 			log.Fatalln("Error creating tun: ", err)
