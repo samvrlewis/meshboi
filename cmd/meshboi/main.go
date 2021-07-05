@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -13,6 +14,21 @@ import (
 )
 
 const defaultPort = 6264 // "mboi" on a telelphone dialpad :)
+
+const usage = `usage: meshboi <cmd> args
+
+Command can be one of
+
+	rolodex	Start meshboi in rollodex mode
+	client		Join as client in an existing peer to peer mesh
+
+More information on both commands and the arguments needed can be found with
+meshboi <cmd> -help. (eg: meshboi rolodex -help).`
+
+func printUsage() {
+	fmt.Println(usage)
+	os.Exit(1)
+}
 
 func main() {
 
@@ -30,7 +46,7 @@ func main() {
 	psk := clientCommand.String("psk", "", "The pre shared key to use (should be the same on all members in the mesh)")
 
 	if len(os.Args) < 2 {
-		log.Fatalln("'server' or 'client' subcommand is required")
+		printUsage()
 	}
 
 	switch os.Args[1] {
@@ -39,8 +55,7 @@ func main() {
 	case "client":
 		clientCommand.Parse(os.Args[2:])
 	default:
-		flag.PrintDefaults()
-		os.Exit(1)
+		printUsage()
 	}
 
 	if clientCommand.Parsed() {
