@@ -24,6 +24,7 @@ type meshNetwork struct {
 	members     map[netaddr.IPPort]time.Time
 	membersLock sync.RWMutex
 	rollo       *rolodex
+	name        string
 	newMember   chan struct{}
 }
 
@@ -36,6 +37,7 @@ func (m *meshNetwork) register(addr netaddr.IPPort) {
 	if !ok {
 		log.WithFields(log.Fields{
 			"address": addr,
+			"name":    m.name,
 		}).Info("Registering new mesh member")
 		m.newMember <- struct{}{}
 	}
@@ -50,6 +52,7 @@ func (r *rolodex) getNetwork(networkName string) *meshNetwork {
 	network.members = make(map[netaddr.IPPort]time.Time)
 	network.rollo = r
 	network.newMember = make(chan struct{})
+	network.name = networkName
 	r.networks[networkName] = network
 
 	go network.Serve()
