@@ -2,7 +2,7 @@
 
 meshboi is a toy mesh VPN implementation, created for fun and learning purposes. It allows the creation of peer to peer networks over the internet in a similar fashion to tools such as [Nebula](https://github.com/slackhq/nebula) and [Tailscale](https://tailscale.com/).
 
-More information about how meshboi works is available on my blog post [Creating a mesh VPN for fun and learning](https://samlewis.me).
+More information about how meshboi works is available on my blog post [Creating a mesh VPN tool for fun and learning](https://www.samlewis.me/2021/07/creating-mesh-vpn-tool-for-fun/).
 
 ## Quick Start
 
